@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Library - VHYes{% endblock %}
+
+{% block content %}
+<section class="library-header">
+    <div>
+        <p class="eyebrow">Physical media shelf</p>
+        <h1>Browse the collection by feel, format, year, or rating.</h1>
+    </div>
+    <a class="button primary" href="{{ url_for('vhyes.add_media') }}">Add Media</a>
+</section>
+
+<form class="filters" method="get">
+    <input name="q" value="{{ filters.q }}" placeholder="Title, plot, person">
+    <select name="format">
+        <option value="">All formats</option>
+        {% for format in formats %}
+            <option value="{{ format.name }}" {% if filters.format == format.name %}selected{% endif %}>{{ format.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="mood">
+        <option value="">Any mood</option>
+        {% for mood in moods %}
+            <option value="{{ mood }}" {% if filters.mood == mood %}selected{% endif %}>{{ mood }}</option>
+        {% endfor %}
+    </select>
+    <select name="year">
+        <option value="">Any year</option>
+        {% for year in years %}
+            <option value="{{ year }}" {% if filters.year == year|string %}selected{% endif %}>{{ year }}</option>
+        {% endfor %}
+    </select>
+    <select name="rating">
+        <option value="">Any rating</option>
+        <option value="8" {% if filters.rating == "8" %}selected{% endif %}>8+</option>
+        <option value="6" {% if filters.rating == "6" %}selected{% endif %}>6+</option>
+        <option value="4" {% if filters.rating == "4" %}selected{% endif %}>4+</option>
+    </select>
+    <button class="button" type="submit">Filter</button>
+</form>
+
+{% if items %}
+    <section class="media-grid">
+        {% for item in items %}
+            <a class="media-card" href="{{ url_for('vhyes.detail', item_id=item.id) }}">
+                <div class="poster">
+                    {% if item.local_path %}
+                        <img src="{{ url_for('vhyes.cover_file', filename=item.local_path) }}" alt="">
+                    {% elif item.remote_url %}
+                        <img src="{{ item.remote_url }}" alt="">
+                    {% else %}
+                        <span>{{ item.title[:1] }}</span>
+                    {% endif %}
+                </div>
+                <div class="media-card-body">
+                    <h2>{{ item.title }}</h2>
+                    <p>{{ item.release_year or "Unknown year" }}{% if item.format_name %} · {{ item.format_name }}{% endif %}</p>
+                    <p>{{ item.mood or "Unsorted mood" }}{% if item.personal_rating or item.rating %} · {{ item.personal_rating or item.rating }}/10{% endif %}</p>
+                </div>
+            </a>
+        {% endfor %}
+    </section>
+{% else %}
+    <section class="empty-state">
+        <h2>No media yet.</h2>
+        <p>Add the first tape, disc, book, or oddball shelf item.</p>
+        <a class="button primary" href="{{ url_for('vhyes.add_media') }}">Add Media</a>
+    </section>
+{% endif %}
+{% endblock %}

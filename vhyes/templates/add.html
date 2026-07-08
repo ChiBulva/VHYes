@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Add Media - VHYes{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <p class="eyebrow">New shelf item</p>
+    <h1>Add by barcode, title search, or manual details.</h1>
+</section>
+
+<form class="lookup-panel" method="post">
+    <input type="hidden" name="lookup_action" value="1">
+    <label>
+        Barcode
+        <input name="barcode" value="{{ form.barcode or candidate.barcode if candidate else form.barcode }}" inputmode="numeric" autofocus>
+    </label>
+    <label>
+        Title
+        <input name="title" value="{{ form.title or '' }}">
+    </label>
+    <button class="button" type="submit">Lookup</button>
+</form>
+
+<form class="media-form" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="save_action" value="1">
+    <input type="hidden" name="source_name" value="{{ candidate.source_name if candidate else '' }}">
+    <input type="hidden" name="source_id" value="{{ candidate.source_id if candidate else '' }}">
+    <input type="hidden" name="remote_url" value="{{ candidate.remote_url if candidate else '' }}">
+
+    <div class="form-main">
+        <label>
+            Title
+            <input name="title" required value="{{ candidate.title if candidate else form.title or '' }}">
+        </label>
+        <div class="split">
+            <label>
+                Media kind
+                <select name="media_kind">
+                    <option value="movie">Movie</option>
+                    <option value="tv">TV</option>
+                    <option value="book">Book</option>
+                    <option value="music">Music</option>
+                    <option value="game">Game</option>
+                    <option value="other">Other</option>
+                </select>
+            </label>
+            <label>
+                Physical format
+                <select name="format_id" required>
+                    {% for format in formats %}
+                        <option value="{{ format.id }}">{{ format.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        <div class="split">
+            <label>
+                Release year
+                <input name="release_year" inputmode="numeric" value="{{ candidate.release_year if candidate else '' }}">
+            </label>
+            <label>
+                Runtime minutes
+                <input name="runtime_minutes" inputmode="numeric">
+            </label>
+        </div>
+        <div class="split">
+            <label>
+                Public rating
+                <input name="rating" inputmode="decimal" value="{{ candidate.rating if candidate else '' }}">
+            </label>
+            <label>
+                Your rating
+                <input name="personal_rating" inputmode="decimal">
+            </label>
+        </div>
+        <label>
+            Mood
+            <input name="mood" placeholder="cozy, tense, weird, comfort, rainy day">
+        </label>
+        <label>
+            Genres
+            <input name="genres" placeholder="Action, Horror, Family">
+        </label>
+        <label>
+            Summary
+            <textarea name="summary" rows="5">{{ candidate.summary if candidate else '' }}</textarea>
+        </label>
+    </div>
+
+    <aside class="copy-panel">
+        <label>
+            Barcode
+            <input name="barcode" value="{{ candidate.barcode if candidate else form.barcode or '' }}" inputmode="numeric">
+        </label>
+        <label>
+            Edition
+            <input name="edition" placeholder="Widescreen, SteelBook, Special Edition">
+        </label>
+        <label>
+            Shelf location
+            <input name="shelf_location" placeholder="Living room shelf B">
+        </label>
+        <label>
+            Condition note
+            <input name="condition_note" placeholder="No case, rewound, scratched disc">
+        </label>
+        <label>
+            Acquired date
+            <input name="acquired_at" type="date">
+        </label>
+        <label>
+            Upload cover
+            <input name="cover_file" type="file" accept="image/png,image/jpeg,image/webp">
+        </label>
+        <label>
+            Image source URL
+            <input name="source_url" value="{{ candidate.remote_url if candidate else '' }}">
+        </label>
+        <label>
+            Image license note
+            <input name="license_note" placeholder="Uploaded by me, TMDB URL only, etc.">
+        </label>
+        <button class="button primary full" type="submit">Save to Library</button>
+    </aside>
+</form>
+{% endblock %}

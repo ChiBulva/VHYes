@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}{{ item.title }} - VHYes{% endblock %}
+
+{% block content %}
+<article class="detail-layout">
+    <div class="poster detail-poster">
+        {% if item.local_path %}
+            <img src="{{ url_for('vhyes.cover_file', filename=item.local_path) }}" alt="">
+        {% elif item.remote_url %}
+            <img src="{{ item.remote_url }}" alt="">
+        {% else %}
+            <span>{{ item.title[:1] }}</span>
+        {% endif %}
+    </div>
+    <section>
+        <p class="eyebrow">{{ item.media_kind }}{% if item.format_name %} · {{ item.format_name }}{% endif %}</p>
+        <h1>{{ item.title }}</h1>
+        <p class="detail-meta">
+            {{ item.release_year or "Unknown year" }}
+            {% if item.mood %} · {{ item.mood }}{% endif %}
+            {% if item.personal_rating or item.rating %} · {{ item.personal_rating or item.rating }}/10{% endif %}
+        </p>
+        {% if genres %}
+            <p class="pills">
+                {% for genre in genres %}
+                    <span>{{ genre }}</span>
+                {% endfor %}
+            </p>
+        {% endif %}
+        {% if item.summary %}
+            <p class="summary">{{ item.summary }}</p>
+        {% endif %}
+        <dl class="facts">
+            <div><dt>Barcode</dt><dd>{{ item.barcode or "None" }}</dd></div>
+            <div><dt>Edition</dt><dd>{{ item.edition or "Standard" }}</dd></div>
+            <div><dt>Shelf</dt><dd>{{ item.shelf_location or "Unplaced" }}</dd></div>
+            <div><dt>Image source</dt><dd>{{ item.source_name or "Manual" }}</dd></div>
+        </dl>
+    </section>
+</article>
+{% endblock %}
