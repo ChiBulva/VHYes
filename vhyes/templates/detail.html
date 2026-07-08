@@ -21,22 +21,53 @@
             {% if item.mood %} · {{ item.mood }}{% endif %}
             {% if item.personal_rating or item.rating %} · {{ item.personal_rating or item.rating }}/10{% endif %}
         </p>
+        <div class="action-row detail-actions">
+            <a class="button primary" href="{{ url_for('vhyes.edit_media', item_id=item.id) }}">Edit Item</a>
+            <a class="button" href="{{ url_for('vhyes.library') }}">Library</a>
+        </div>
         {% if genres %}
             <p class="pills">
-                {% for genre in genres %}
-                    <span>{{ genre }}</span>
-                {% endfor %}
+                {% for genre in genres %}<span>{{ genre }}</span>{% endfor %}
             </p>
         {% endif %}
-        {% if item.summary %}
-            <p class="summary">{{ item.summary }}</p>
+        {% if tags %}
+            <p class="pills muted-pills">
+                {% for tag in tags %}<span>{{ tag.name }}</span>{% endfor %}
+            </p>
         {% endif %}
+        {% if item.summary %}<p class="summary">{{ item.summary }}</p>{% endif %}
+        {% if item.mood_summary %}<p class="summary">{{ item.mood_summary }}</p>{% endif %}
         <dl class="facts">
             <div><dt>Barcode</dt><dd>{{ item.barcode or "None" }}</dd></div>
             <div><dt>Edition</dt><dd>{{ item.edition or "Standard" }}</dd></div>
             <div><dt>Shelf</dt><dd>{{ item.shelf_location or "Unplaced" }}</dd></div>
-            <div><dt>Image source</dt><dd>{{ item.source_name or "Manual" }}</dd></div>
+            <div><dt>Condition</dt><dd>{{ item.condition_note or "Unnoted" }}</dd></div>
+            <div><dt>Purchase</dt><dd>{% if item.purchase_price is not none %}${{ '%.2f'|format(item.purchase_price) }}{% else %}Unknown{% endif %}</dd></div>
+            <div><dt>Value</dt><dd>{% if item.estimated_value is not none %}${{ '%.2f'|format(item.estimated_value) }}{% else %}Unknown{% endif %}</dd></div>
+            <div><dt>Source</dt><dd>{{ item.source_name or "Manual" }}</dd></div>
+            <div><dt>Fingerprint</dt><dd>{{ item.source_fingerprint or "None" }}</dd></div>
         </dl>
+
+        {% if external_links %}
+            <section class="detail-section">
+                <h2>Links</h2>
+                <p class="pills">
+                    {% for link in external_links %}<a href="{{ link.url }}" rel="noreferrer">{{ link.label }}</a>{% endfor %}
+                </p>
+            </section>
+        {% endif %}
+
+        {% if metadata_sources %}
+            <section class="detail-section">
+                <h2>Metadata</h2>
+                <dl class="facts">
+                    {% for source in metadata_sources %}
+                        <div><dt>{{ source.source_name }}</dt><dd>{{ source.source_id or source.source_url or "stored" }}</dd></div>
+                    {% endfor %}
+                </dl>
+            </section>
+        {% endif %}
+
         <form class="danger-zone" method="post" action="{{ url_for('vhyes.delete_media', item_id=item.id) }}" onsubmit="return confirm('Remove {{ item.title|e }} from VHYes?');">
             <button class="button danger" type="submit">Remove Media</button>
         </form>

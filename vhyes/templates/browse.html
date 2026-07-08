@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Browse - VHYes{% endblock %}
+
+{% block content %}
+<section class="library-header">
+    <div>
+        <p class="eyebrow">Discovery</p>
+        <h1>Find something by shelf logic, not streaming logic.</h1>
+    </div>
+    <a class="button primary" href="{{ url_for('vhyes.random_pick') }}">Random Pick</a>
+</section>
+
+<section class="browse-grid">
+    <div class="browse-panel">
+        <h2>Formats</h2>
+        {% for item in formats %}
+            <a href="{{ url_for('vhyes.library', format=item.name) }}"><span>{{ item.name }}</span><strong>{{ item.count }}</strong></a>
+        {% else %}<p>No format data yet.</p>{% endfor %}
+    </div>
+    <div class="browse-panel">
+        <h2>Moods</h2>
+        {% for item in moods %}
+            <a href="{{ url_for('vhyes.library', mood=item.name) }}"><span>{{ item.name }}</span><strong>{{ item.count }}</strong></a>
+        {% else %}<p>No moods tagged yet.</p>{% endfor %}
+    </div>
+    <div class="browse-panel">
+        <h2>Decades</h2>
+        {% for item in decades %}
+            <a href="{{ url_for('vhyes.library', year=item.decade ~ 's') }}"><span>{{ item.decade }}s</span><strong>{{ item.count }}</strong></a>
+        {% else %}<p>No year data yet.</p>{% endfor %}
+    </div>
+    <div class="browse-panel">
+        <h2>Shelves</h2>
+        {% for item in shelves %}
+            <a href="{{ url_for('vhyes.library', shelf=item.name) }}"><span>{{ item.name }}</span><strong>{{ item.count }}</strong></a>
+        {% else %}<p>No shelf locations yet.</p>{% endfor %}
+    </div>
+    <div class="browse-panel">
+        <h2>Tags</h2>
+        {% for item in tags %}
+            <a href="{{ url_for('vhyes.library', tag=item.name) }}"><span>{{ item.name }}</span><strong>{{ item.count }}</strong></a>
+        {% else %}<p>No filter tags yet.</p>{% endfor %}
+    </div>
+    <div class="browse-panel featured-pick">
+        <h2>Pick For Me</h2>
+        {% if random_item %}
+            <a href="{{ url_for('vhyes.detail', item_id=random_item.id) }}"><span>{{ random_item.title }}</span><strong>{{ random_item.format_name or "" }}</strong></a>
+        {% else %}<p>No media yet.</p>{% endif %}
+    </div>
+</section>
+
+{% if recent %}
+<section class="results-section">
+    <p class="result-count">Recently added</p>
+    <div class="media-grid">
+        {% for item in recent %}
+            <a class="media-card" href="{{ url_for('vhyes.detail', item_id=item.id) }}">
+                <div class="poster">
+                    {% if item.local_path %}<img src="{{ url_for('vhyes.cover_file', filename=item.local_path) }}" alt="">
+                    {% elif item.remote_url %}<img src="{{ item.remote_url }}" alt="">
+                    {% else %}<span>{{ item.title[:1] }}</span>{% endif %}
+                </div>
+                <div class="media-card-body">
+                    <h2>{{ item.title }}</h2>
+                    <p>{{ item.release_year or "Unknown year" }}{% if item.format_name %} · {{ item.format_name }}{% endif %}</p>
+                </div>
+            </a>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}

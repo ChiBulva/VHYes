@@ -6,23 +6,44 @@
 <section class="library-header">
     <div>
         <p class="eyebrow">Physical media shelf</p>
-        <h1>Browse the collection by feel, format, year, or rating.</h1>
+        <h1>Browse the collection by feel, format, year, shelf, or rating.</h1>
     </div>
-    <a class="button primary" href="{{ url_for('vhyes.add_media') }}">Add Media</a>
+    <div class="action-row">
+        <a class="button" href="{{ url_for('vhyes.random_pick') }}">Random Pick</a>
+        <a class="button primary" href="{{ url_for('vhyes.add_media') }}">Add Media</a>
+    </div>
 </section>
 
-<form class="filters" method="get">
-    <input name="q" value="{{ filters.q }}" placeholder="Title, plot, person">
+<form class="filters library-filters" method="get">
+    <input name="q" value="{{ filters.q }}" placeholder="Title, plot, notes">
     <select name="format">
         <option value="">All formats</option>
         {% for format in formats %}
             <option value="{{ format.name }}" {% if filters.format == format.name %}selected{% endif %}>{{ format.name }}</option>
         {% endfor %}
     </select>
+    <select name="kind">
+        <option value="">Any kind</option>
+        {% for kind in kinds %}
+            <option value="{{ kind }}" {% if filters.kind == kind %}selected{% endif %}>{{ kind }}</option>
+        {% endfor %}
+    </select>
     <select name="mood">
         <option value="">Any mood</option>
         {% for mood in moods %}
             <option value="{{ mood }}" {% if filters.mood == mood %}selected{% endif %}>{{ mood }}</option>
+        {% endfor %}
+    </select>
+    <select name="shelf">
+        <option value="">Any shelf</option>
+        {% for shelf in shelves %}
+            <option value="{{ shelf }}" {% if filters.shelf == shelf %}selected{% endif %}>{{ shelf }}</option>
+        {% endfor %}
+    </select>
+    <select name="tag">
+        <option value="">Any tag</option>
+        {% for tag in tags %}
+            <option value="{{ tag.name }}" {% if filters.tag == tag.name %}selected{% endif %}>{{ tag.name }}</option>
         {% endfor %}
     </select>
     <select name="year">
@@ -56,15 +77,15 @@
                 <div class="media-card-body">
                     <h2>{{ item.title }}</h2>
                     <p>{{ item.release_year or "Unknown year" }}{% if item.format_name %} · {{ item.format_name }}{% endif %}</p>
-                    <p>{{ item.mood or "Unsorted mood" }}{% if item.personal_rating or item.rating %} · {{ item.personal_rating or item.rating }}/10{% endif %}</p>
+                    <p>{{ item.mood or item.shelf_location or "Unsorted" }}{% if item.personal_rating or item.rating %} · {{ item.personal_rating or item.rating }}/10{% endif %}</p>
                 </div>
             </a>
         {% endfor %}
     </section>
 {% else %}
     <section class="empty-state">
-        <h2>No media yet.</h2>
-        <p>Add the first tape, disc, book, or oddball shelf item.</p>
+        <h2>No media matches.</h2>
+        <p>Clear filters or add the first shelf item.</p>
         <a class="button primary" href="{{ url_for('vhyes.add_media') }}">Add Media</a>
     </section>
 {% endif %}

@@ -81,7 +81,10 @@ def search_tmdb(query, api_key):
                 "barcode": "",
                 "source_name": "tmdb",
                 "source_id": str(item.get("id")),
+                "source_url": f"https://www.themoviedb.org/movie/{item.get('id')}",
                 "remote_url": _tmdb_image_url(item.get("poster_path")),
+                "confidence": item.get("popularity"),
+                "raw_payload": item,
             }
         )
     return results
@@ -123,7 +126,10 @@ def search_wikidata(query):
                 "barcode": "",
                 "source_name": "wikidata",
                 "source_id": item.get("id"),
+                "source_url": f"https://www.wikidata.org/wiki/{item.get('id')}",
                 "remote_url": "",
+                "confidence": None,
+                "raw_payload": item,
             }
         )
     return results
@@ -170,7 +176,10 @@ def search_open_library(query):
                 "brand": ", ".join(authors[:2]),
                 "source_name": "openlibrary",
                 "source_id": source_id,
+                "source_url": f"https://openlibrary.org/works/{source_id}" if source_id else "",
                 "remote_url": _open_library_cover_url(cover_id),
+                "confidence": item.get("edition_count"),
+                "raw_payload": item,
             }
         )
     return results
@@ -284,6 +293,9 @@ def _barcode_lookup_to_candidate(product):
         "remote_url": (product.get("images") or [None])[0],
         "source_name": "barcodelookup",
         "source_id": product.get("barcode_number"),
+        "source_url": "",
+        "confidence": None,
+        "raw_payload": product,
     }
 
 
@@ -299,6 +311,9 @@ def _upcitemdb_to_candidate(item):
         "remote_url": (item.get("images") or [None])[0],
         "source_name": "upcitemdb",
         "source_id": item.get("upc") or item.get("ean"),
+        "source_url": f"https://www.upcitemdb.com/upc/{item.get('upc') or item.get('ean')}",
+        "confidence": None,
+        "raw_payload": item,
     }
 
 

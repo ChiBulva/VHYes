@@ -16,15 +16,20 @@ CREATE TABLE IF NOT EXISTS formats (
 CREATE TABLE IF NOT EXISTS media_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
+    sort_title TEXT,
     media_kind TEXT NOT NULL DEFAULT 'movie',
     release_year INTEGER,
     runtime_minutes INTEGER,
     rating REAL,
     personal_rating REAL,
     mood TEXT,
+    mood_summary TEXT,
     summary TEXT,
+    filter_notes TEXT,
+    extra_info TEXT,
     source_name TEXT,
     source_id TEXT,
+    source_fingerprint TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -37,6 +42,8 @@ CREATE TABLE IF NOT EXISTS physical_copies (
     edition TEXT,
     shelf_location TEXT,
     condition_note TEXT,
+    purchase_price REAL,
+    estimated_value REAL,
     acquired_at TEXT,
     created_at TEXT NOT NULL
 );
@@ -73,10 +80,46 @@ CREATE TABLE IF NOT EXISTS barcode_cache (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS metadata_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_item_id INTEGER NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,
+    source_name TEXT NOT NULL,
+    source_id TEXT,
+    source_url TEXT,
+    raw_payload TEXT,
+    confidence REAL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS external_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_item_id INTEGER NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,
+    label TEXT NOT NULL,
+    url TEXT NOT NULL,
+    source_name TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    tag_type TEXT NOT NULL DEFAULT 'filter',
+    UNIQUE(name, tag_type)
+);
+
+CREATE TABLE IF NOT EXISTS media_tags (
+    media_item_id INTEGER NOT NULL REFERENCES media_items(id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (media_item_id, tag_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_media_title ON media_items(title);
 CREATE INDEX IF NOT EXISTS idx_media_year ON media_items(release_year);
 CREATE INDEX IF NOT EXISTS idx_media_mood ON media_items(mood);
 CREATE INDEX IF NOT EXISTS idx_copies_barcode ON physical_copies(barcode);
+CREATE INDEX IF NOT EXISTS idx_metadata_sources_item ON metadata_sources(media_item_id);
+CREATE INDEX IF NOT EXISTS idx_external_links_item ON external_links(media_item_id);
 """
 
 DEFAULT_FORMATS = [
@@ -86,8 +129,12 @@ DEFAULT_FORMATS = [
     ("4K UHD", 40),
     ("LaserDisc", 50),
     ("Book", 60),
-    ("CD", 70),
-    ("Cassette", 80),
+    ("Magazine", 70),
+    ("Audiobook", 80),
+    ("CD", 90),
+    ("Vinyl", 100),
+    ("Cassette", 110),
+    ("Comic", 120),
     ("Other", 999),
 ]
 
@@ -109,11 +156,45 @@ def close_db(error=None):
 def init_db():
     db = get_db()
     db.executescript(SCHEMA)
+    _ensure_columns(db)
+    db.execute("CREATE INDEX IF NOT EXISTS idx_media_sort_title ON media_items(sort_title)")
     db.executemany(
         "INSERT OR IGNORE INTO formats (name, sort_order) VALUES (?, ?)",
         DEFAULT_FORMATS,
     )
     db.commit()
+
+
+def _ensure_columns(db):
+    _add_missing_columns(
+        db,
+        "media_items",
+        {
+            "sort_title": "TEXT",
+            "mood_summary": "TEXT",
+            "filter_notes": "TEXT",
+            "extra_info": "TEXT",
+            "source_fingerprint": "TEXT",
+        },
+    )
+    _add_missing_columns(
+        db,
+        "physical_copies",
+        {
+            "purchase_price": "REAL",
+            "estimated_value": "REAL",
+        },
+    )
+
+
+def _add_missing_columns(db, table, columns):
+    existing = {
+        row["name"]
+        for row in db.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    for name, definition in columns.items():
+        if name not in existing:
+            db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
 
 def now_iso():

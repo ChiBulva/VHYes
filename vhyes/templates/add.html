@@ -83,7 +83,9 @@
                             <input type="hidden" name="remote_url" value="{{ candidate.remote_url or '' }}">
                             <input type="hidden" name="source_name" value="{{ candidate.source_name or '' }}">
                             <input type="hidden" name="source_id" value="{{ candidate.source_id or '' }}">
-                            <input type="hidden" name="source_url" value="{{ candidate.remote_url or '' }}">
+                            <input type="hidden" name="source_url" value="{{ candidate.source_url or candidate.remote_url or '' }}">
+                            <input type="hidden" name="confidence" value="{{ candidate.confidence or '' }}">
+                            <textarea hidden name="raw_payload">{{ candidate.raw_payload or '' }}</textarea>
                             <input type="hidden" name="license_note" value="Remote image URL stored from {{ candidate.source_name or 'metadata source' }}; not cached locally.">
                             <button class="button primary full" type="submit">Add This</button>
                         </form>
