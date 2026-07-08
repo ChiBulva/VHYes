@@ -433,3 +433,39 @@ label {
     background: var(--red);
     color: white;
 }
+
+
+.toggle-line {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    color: var(--ink);
+    background: rgba(255, 250, 240, 0.9);
+    border: 1px solid var(--line);
+    padding: 0 12px;
+    white-space: nowrap;
+}
+
+.toggle-line input {
+    width: auto;
+    min-height: auto;
+}
+
+.image-options {
+    border: 1px solid var(--line);
+    background: rgba(255, 253, 247, 0.7);
+    padding: 9px 10px;
+}
+
+.image-options summary {
+    cursor: pointer;
+    color: var(--accent-strong);
+    font-family: Verdana, sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.image-options label {
+    margin-top: 10px;
+}

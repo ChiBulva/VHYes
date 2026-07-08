@@ -9,6 +9,10 @@
     <form class="scan-box" method="post" autocomplete="off">
         <input type="hidden" name="search_action" value="1">
         <input name="query" value="{{ query }}" placeholder="027616165633 or The Wizard of Oz" inputmode="search" autofocus>
+        <label class="toggle-line">
+            <input type="checkbox" name="auto_add_single" value="1" {% if auto_add_single %}checked{% endif %}>
+            Auto-add one barcode match
+        </label>
         <button class="button primary" type="submit">Search</button>
     </form>
 </section>
@@ -36,7 +40,18 @@
                         {% if candidate.summary %}
                             <p class="result-summary">{{ candidate.summary }}</p>
                         {% endif %}
-                        <form method="post">
+                        <details class="image-options">
+                            <summary>Use own image</summary>
+                            <label>
+                                Upload image
+                                <input form="add-result-{{ loop.index }}" name="cover_file" type="file" accept="image/png,image/jpeg,image/webp">
+                            </label>
+                            <label>
+                                Image URL
+                                <input form="add-result-{{ loop.index }}" name="image_url_override" placeholder="https://example.com/cover.jpg">
+                            </label>
+                        </details>
+                        <form id="add-result-{{ loop.index }}" method="post" enctype="multipart/form-data">
                             <input type="hidden" name="add_action" value="1">
                             <input type="hidden" name="title" value="{{ candidate.title or '' }}">
                             <input type="hidden" name="media_kind" value="{{ candidate.media_kind or 'movie' }}">

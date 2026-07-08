@@ -14,7 +14,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from .db import get_db, now_iso
-from .metadata import lookup_barcode, search_tmdb, search_wikidata
+from .metadata import is_physical_media_candidate, lookup_barcode, search_tmdb, search_wikidata
 
 bp = Blueprint("vhyes", __name__)
 
@@ -85,20 +85,29 @@ def library():
 def add_media():
     query = ""
     candidates = []
+    auto_add_single = request.form.get("auto_add_single") == "1"
 
     if request.method == "POST" and request.form.get("search_action"):
         query = request.form.get("query", "").strip()
         candidates = _search_candidates(query)
+        is_barcode = _is_barcode_query(query)
+
+        if is_barcode and auto_add_single and len(candidates) == 1:
+            item_id = _save_media(_candidate_to_save_data(candidates[0]), None)
+            flash(f"Added {candidates[0].get('title', 'media')}.", "success")
+            return redirect(url_for("vhyes.add_media"))
+
         if not candidates:
-            flash("No match found. Try the title instead of the barcode, or check API keys.", "warn")
+            flash("No physical media match found. Try the title instead of the barcode.", "warn")
 
     if request.method == "POST" and request.form.get("add_action"):
-        item_id = _save_media(request.form, None)
+        item_id = _save_media(request.form, request.files.get("cover_file"))
         flash(f"Added {request.form.get('title', 'media')}.", "success")
         return redirect(url_for("vhyes.add_media"))
 
     return render_template(
         "add.html",
+        auto_add_single=auto_add_single,
         candidates=candidates,
         formats=_formats(),
         query=query,
@@ -161,17 +170,37 @@ def _search_candidates(query):
     if not query:
         return []
 
-    if query.replace("-", "").replace(" ", "").isdigit():
+    if _is_barcode_query(query):
         candidate = lookup_barcode(
-            query.replace("-", "").replace(" ", ""),
+            _clean_barcode(query),
             current_app.config["BARCODE_LOOKUP_API_KEY"],
         )
-        return [_prepare_candidate(candidate)] if candidate else []
+        if not candidate or not is_physical_media_candidate(candidate):
+            return []
+        return [_prepare_candidate(candidate)]
 
     candidates = search_tmdb(query, current_app.config["TMDB_API_KEY"])
     if not candidates:
         candidates = search_wikidata(query)
     return [_prepare_candidate(candidate) for candidate in candidates]
+
+
+def _candidate_to_save_data(candidate):
+    data = dict(candidate)
+    data.setdefault("source_url", data.get("remote_url") or "")
+    data.setdefault(
+        "license_note",
+        f"Remote image URL stored from {data.get('source_name') or 'metadata source'}; not cached locally.",
+    )
+    return data
+
+
+def _is_barcode_query(query):
+    return _clean_barcode(query).isdigit()
+
+
+def _clean_barcode(query):
+    return (query or "").replace("-", "").replace(" ", "").strip()
 
 
 def _prepare_candidate(candidate):
@@ -291,7 +320,7 @@ def _save_image(db, item_id, form, upload, now):
         upload.save(os.path.join(current_app.config["COVERS_DIR"], stored_name))
         local_path = stored_name
 
-    remote_url = form.get("remote_url", "").strip() or None
+    remote_url = form.get("image_url_override", "").strip() or form.get("remote_url", "").strip() or None
     if local_path or remote_url:
         db.execute(
             """
@@ -306,7 +335,7 @@ def _save_image(db, item_id, form, upload, now):
                 local_path,
                 remote_url,
                 form.get("source_name", "").strip() or None,
-                form.get("source_url", "").strip() or None,
+                (form.get("image_url_override", "").strip() or form.get("source_url", "").strip()) or None,
                 form.get("license_note", "").strip() or None,
                 now,
             ),

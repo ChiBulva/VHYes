@@ -8,6 +8,46 @@ BARCODE_LOOKUP_URL = "https://api.barcodelookup.com/v3/products"
 UPCITEMDB_URL = "https://api.upcitemdb.com/prod/trial/lookup"
 WIKIDATA_SEARCH_URL = "https://www.wikidata.org/w/api.php"
 
+PHYSICAL_MEDIA_TERMS = (
+    "media",
+    "dvd",
+    "video",
+    "vhs",
+    "blu-ray",
+    "bluray",
+    "4k",
+    "ultra hd",
+    "uhd",
+    "laserdisc",
+    "book",
+    "books",
+    "magazine",
+    "magazines",
+    "comic",
+    "manga",
+    "graphic novel",
+    "music",
+    "cd",
+    "compact disc",
+    "vinyl",
+    "cassette",
+    "record",
+)
+
+NON_MEDIA_TERMS = (
+    "toploader",
+    "top loader",
+    "sleeve",
+    "protector",
+    "storage",
+    "toy",
+    "toys & games",
+    "card games",
+    "trading card",
+    "accessory",
+    "supplies",
+)
+
 
 def search_tmdb(query, api_key):
     if not api_key or not query:
@@ -101,6 +141,31 @@ def lookup_barcode(barcode, barcode_lookup_key=""):
     return _upcitemdb_to_candidate(items[0]) if items else None
 
 
+def is_physical_media_candidate(candidate):
+    haystack = " ".join(
+        str(candidate.get(key) or "")
+        for key in ("title", "summary", "category", "brand")
+    ).lower()
+
+    if any(term in haystack for term in NON_MEDIA_TERMS):
+        return False
+    return any(term in haystack for term in PHYSICAL_MEDIA_TERMS)
+
+
+def infer_media_kind(candidate):
+    haystack = " ".join(
+        str(candidate.get(key) or "")
+        for key in ("title", "summary", "category")
+    ).lower()
+    if any(term in haystack for term in ("book", "paperback", "hardcover", "isbn")):
+        return "book"
+    if any(term in haystack for term in ("magazine", "periodical")):
+        return "magazine"
+    if any(term in haystack for term in ("music", "cd", "vinyl", "record", "cassette")):
+        return "music"
+    return "movie"
+
+
 def clean_barcode_title(title):
     title = title or ""
     title = re.sub(r"\s*\(B[0-9A-Z]{9}\)\s*$", "", title).strip()
@@ -133,9 +198,11 @@ def _tmdb_image_url(path):
 def _barcode_lookup_to_candidate(product):
     return {
         "title": product.get("title"),
-        "media_kind": "movie",
+        "media_kind": infer_media_kind(product),
         "release_year": _year_from_date(product.get("release_date")),
         "summary": product.get("description"),
+        "category": product.get("category"),
+        "brand": product.get("brand"),
         "barcode": product.get("barcode_number"),
         "remote_url": (product.get("images") or [None])[0],
         "source_name": "barcodelookup",
@@ -146,9 +213,11 @@ def _barcode_lookup_to_candidate(product):
 def _upcitemdb_to_candidate(item):
     return {
         "title": clean_barcode_title(item.get("title")),
-        "media_kind": "movie",
+        "media_kind": infer_media_kind(item),
         "release_year": None,
         "summary": item.get("description"),
+        "category": item.get("category"),
+        "brand": item.get("brand"),
         "barcode": item.get("upc") or item.get("ean"),
         "remote_url": (item.get("images") or [None])[0],
         "source_name": "upcitemdb",
