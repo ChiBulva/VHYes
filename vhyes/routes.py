@@ -13,8 +13,8 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-from .db import get_db, now_iso, row_to_dict
-from .metadata import lookup_barcode, search_tmdb
+from .db import get_db, now_iso
+from .metadata import lookup_barcode, search_tmdb, search_wikidata
 
 bp = Blueprint("vhyes", __name__)
 
@@ -83,22 +83,25 @@ def library():
 
 @bp.route("/add", methods=("GET", "POST"))
 def add_media():
-    candidate = None
-    if request.method == "POST" and request.form.get("lookup_action"):
-        candidate = _lookup_candidate(request.form)
-        if not candidate:
-            flash("No metadata match found. You can still add it manually.", "warn")
+    query = ""
+    candidates = []
 
-    if request.method == "POST" and request.form.get("save_action"):
-        item_id = _save_media(request.form, request.files.get("cover_file"))
-        flash("Media added.", "success")
-        return redirect(url_for("vhyes.detail", item_id=item_id))
+    if request.method == "POST" and request.form.get("search_action"):
+        query = request.form.get("query", "").strip()
+        candidates = _search_candidates(query)
+        if not candidates:
+            flash("No match found. Try the title instead of the barcode, or check API keys.", "warn")
+
+    if request.method == "POST" and request.form.get("add_action"):
+        item_id = _save_media(request.form, None)
+        flash(f"Added {request.form.get('title', 'media')}.", "success")
+        return redirect(url_for("vhyes.add_media"))
 
     return render_template(
         "add.html",
+        candidates=candidates,
         formats=_formats(),
-        candidate=candidate,
-        form=request.form,
+        query=query,
     )
 
 
@@ -139,24 +142,62 @@ def cover_file(filename):
     return send_from_directory(current_app.config["COVERS_DIR"], filename)
 
 
-def _lookup_candidate(form):
-    barcode = form.get("barcode", "").strip()
-    title = form.get("title", "").strip()
+def _search_candidates(query):
+    query = (query or "").strip()
+    if not query:
+        return []
 
-    try:
-        if barcode:
-            candidate = lookup_barcode(
-                barcode,
-                current_app.config["BARCODE_LOOKUP_API_KEY"],
-            )
-            if candidate:
-                return candidate
+    if query.replace("-", "").replace(" ", "").isdigit():
+        candidate = lookup_barcode(
+            query.replace("-", "").replace(" ", ""),
+            current_app.config["BARCODE_LOOKUP_API_KEY"],
+        )
+        return [_prepare_candidate(candidate)] if candidate else []
 
-        results = search_tmdb(title, current_app.config["TMDB_API_KEY"])
-        return results[0] if results else None
-    except Exception as exc:
-        flash(f"Lookup failed: {exc}", "error")
+    candidates = search_tmdb(query, current_app.config["TMDB_API_KEY"])
+    if not candidates:
+        candidates = search_wikidata(query)
+    return [_prepare_candidate(candidate) for candidate in candidates]
+
+
+def _prepare_candidate(candidate):
+    if not candidate:
         return None
+
+    candidate = dict(candidate)
+    candidate.setdefault("media_kind", "movie")
+    candidate.setdefault("barcode", "")
+    candidate.setdefault("summary", "")
+    candidate.setdefault("rating", "")
+    candidate.setdefault("release_year", "")
+    candidate.setdefault("remote_url", "")
+    candidate["format_id"] = _infer_format_id(candidate)
+    return candidate
+
+
+def _infer_format_id(candidate):
+    text = " ".join(
+        str(candidate.get(key) or "")
+        for key in ("title", "summary")
+    ).lower()
+
+    if "4k" in text or "uhd" in text or "ultra hd" in text:
+        preferred = "4K UHD"
+    elif "blu-ray" in text or "bluray" in text or "blue ray" in text:
+        preferred = "Blu-ray"
+    elif "dvd" in text:
+        preferred = "DVD"
+    elif "vhs" in text or "videocassette" in text:
+        preferred = "VHS"
+    else:
+        preferred = "Other"
+
+    match = get_db().execute("SELECT id FROM formats WHERE name = ?", (preferred,)).fetchone()
+    if match:
+        return match["id"]
+
+    fallback = get_db().execute("SELECT id FROM formats WHERE name = 'Other'").fetchone()
+    return fallback["id"] if fallback else None
 
 
 def _save_media(form, cover_file):

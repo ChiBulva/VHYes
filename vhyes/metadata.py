@@ -1,9 +1,12 @@
+import re
+
 import requests
 
 
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 BARCODE_LOOKUP_URL = "https://api.barcodelookup.com/v3/products"
 UPCITEMDB_URL = "https://api.upcitemdb.com/prod/trial/lookup"
+WIKIDATA_SEARCH_URL = "https://www.wikidata.org/w/api.php"
 
 
 def search_tmdb(query, api_key):
@@ -22,12 +25,56 @@ def search_tmdb(query, api_key):
         results.append(
             {
                 "title": item.get("title") or item.get("original_title"),
+                "media_kind": "movie",
                 "release_year": _year_from_date(item.get("release_date")),
                 "summary": item.get("overview"),
                 "rating": item.get("vote_average"),
+                "barcode": "",
                 "source_name": "tmdb",
                 "source_id": str(item.get("id")),
                 "remote_url": _tmdb_image_url(item.get("poster_path")),
+            }
+        )
+    return results
+
+
+def search_wikidata(query):
+    if not query:
+        return []
+
+    response = requests.get(
+        WIKIDATA_SEARCH_URL,
+        params={
+            "action": "wbsearchentities",
+            "format": "json",
+            "language": "en",
+            "uselang": "en",
+            "type": "item",
+            "limit": 10,
+            "search": query,
+        },
+        headers={"User-Agent": "VHYes local media catalog"},
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    results = []
+    for item in response.json().get("search", []):
+        description = item.get("description") or ""
+        haystack = f"{item.get('label', '')} {description}".lower()
+        if not any(word in haystack for word in ("film", "movie", "television", "series", "video")):
+            continue
+        results.append(
+            {
+                "title": item.get("label"),
+                "media_kind": "movie",
+                "release_year": _year_from_text(description),
+                "summary": description,
+                "rating": "",
+                "barcode": "",
+                "source_name": "wikidata",
+                "source_id": item.get("id"),
+                "remote_url": "",
             }
         )
     return results
@@ -54,6 +101,20 @@ def lookup_barcode(barcode, barcode_lookup_key=""):
     return _upcitemdb_to_candidate(items[0]) if items else None
 
 
+def clean_barcode_title(title):
+    title = title or ""
+    title = re.sub(r"\s*\(B[0-9A-Z]{9}\)\s*$", "", title).strip()
+    title = title.replace("OZ", "Oz")
+    return title
+
+
+def _year_from_text(value):
+    if not value:
+        return None
+    match = re.search(r"\b(18|19|20)\d{2}\b", value)
+    return int(match.group(0)) if match else None
+
+
 def _year_from_date(value):
     if not value:
         return None
@@ -72,6 +133,7 @@ def _tmdb_image_url(path):
 def _barcode_lookup_to_candidate(product):
     return {
         "title": product.get("title"),
+        "media_kind": "movie",
         "release_year": _year_from_date(product.get("release_date")),
         "summary": product.get("description"),
         "barcode": product.get("barcode_number"),
@@ -83,7 +145,8 @@ def _barcode_lookup_to_candidate(product):
 
 def _upcitemdb_to_candidate(item):
     return {
-        "title": item.get("title"),
+        "title": clean_barcode_title(item.get("title")),
+        "media_kind": "movie",
         "release_year": None,
         "summary": item.get("description"),
         "barcode": item.get("upc") or item.get("ean"),
