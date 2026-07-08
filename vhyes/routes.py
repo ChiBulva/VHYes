@@ -14,7 +14,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from .db import get_db, now_iso
-from .metadata import is_physical_media_candidate, lookup_barcode, search_tmdb, search_wikidata
+from .metadata import is_physical_media_candidate, lookup_barcode, search_open_library, search_tmdb, search_wikidata
 
 bp = Blueprint("vhyes", __name__)
 
@@ -179,10 +179,27 @@ def _search_candidates(query):
             return []
         return [_prepare_candidate(candidate)]
 
-    candidates = search_tmdb(query, current_app.config["TMDB_API_KEY"])
-    if not candidates:
-        candidates = search_wikidata(query)
-    return [_prepare_candidate(candidate) for candidate in candidates]
+    candidates = []
+    candidates.extend(search_tmdb(query, current_app.config["TMDB_API_KEY"]))
+    candidates.extend(search_open_library(query))
+    candidates.extend(search_wikidata(query))
+    return [_prepare_candidate(candidate) for candidate in _dedupe_candidates(candidates)]
+
+
+def _dedupe_candidates(candidates):
+    seen = set()
+    unique = []
+    for candidate in candidates:
+        title = (candidate.get("title") or "").strip().lower()
+        year = candidate.get("release_year") or ""
+        source = candidate.get("source_name") or ""
+        source_id = candidate.get("source_id") or ""
+        key = (source, source_id) if source_id else (title, year)
+        if not title or key in seen:
+            continue
+        seen.add(key)
+        unique.append(candidate)
+    return unique[:24]
 
 
 def _candidate_to_save_data(candidate):

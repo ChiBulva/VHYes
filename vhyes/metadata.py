@@ -7,6 +7,7 @@ TMDB_BASE_URL = "https://api.themoviedb.org/3"
 BARCODE_LOOKUP_URL = "https://api.barcodelookup.com/v3/products"
 UPCITEMDB_URL = "https://api.upcitemdb.com/prod/trial/lookup"
 WIKIDATA_SEARCH_URL = "https://www.wikidata.org/w/api.php"
+OPEN_LIBRARY_SEARCH_URL = "https://openlibrary.org/search.json"
 
 PHYSICAL_MEDIA_TERMS = (
     "media",
@@ -120,6 +121,53 @@ def search_wikidata(query):
     return results
 
 
+def search_open_library(query):
+    if not query:
+        return []
+
+    response = requests.get(
+        OPEN_LIBRARY_SEARCH_URL,
+        params={"q": query, "limit": 12},
+        headers={"User-Agent": "VHYes local media catalog"},
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    results = []
+    for item in response.json().get("docs", [])[:12]:
+        title = item.get("title")
+        if not title:
+            continue
+
+        authors = item.get("author_name") or []
+        publish_year = item.get("first_publish_year")
+        cover_id = item.get("cover_i")
+        source_id = (item.get("key") or "").replace("/works/", "")
+
+        summary_parts = []
+        if authors:
+            summary_parts.append("by " + ", ".join(authors[:2]))
+        if item.get("edition_count"):
+            summary_parts.append(f"{item.get('edition_count')} edition(s)")
+
+        results.append(
+            {
+                "title": title,
+                "media_kind": _open_library_kind(item),
+                "release_year": publish_year,
+                "summary": "; ".join(summary_parts),
+                "rating": "",
+                "barcode": "",
+                "category": "Books",
+                "brand": ", ".join(authors[:2]),
+                "source_name": "openlibrary",
+                "source_id": source_id,
+                "remote_url": _open_library_cover_url(cover_id),
+            }
+        )
+    return results
+
+
 def lookup_barcode(barcode, barcode_lookup_key=""):
     barcode = (barcode or "").strip()
     if not barcode:
@@ -223,3 +271,19 @@ def _upcitemdb_to_candidate(item):
         "source_name": "upcitemdb",
         "source_id": item.get("upc") or item.get("ean"),
     }
+
+
+def _open_library_cover_url(cover_id):
+    if not cover_id:
+        return ""
+    return f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+
+
+def _open_library_kind(item):
+    subjects = " ".join(item.get("subject") or []).lower()
+    title = (item.get("title") or "").lower()
+    if "magazine" in subjects or "magazine" in title:
+        return "magazine"
+    if "comic" in subjects or "graphic novel" in subjects or "manga" in subjects:
+        return "book"
+    return "book"
