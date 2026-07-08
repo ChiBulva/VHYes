@@ -3,6 +3,14 @@ import re
 import requests
 
 
+class BarcodeLookupError(Exception):
+    pass
+
+
+class BarcodeRateLimitError(BarcodeLookupError):
+    pass
+
+
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 BARCODE_LOOKUP_URL = "https://api.barcodelookup.com/v3/products"
 UPCITEMDB_URL = "https://api.upcitemdb.com/prod/trial/lookup"
@@ -179,14 +187,35 @@ def lookup_barcode(barcode, barcode_lookup_key=""):
             params={"barcode": barcode, "formatted": "y", "key": barcode_lookup_key},
             timeout=10,
         )
-        response.raise_for_status()
+        _raise_for_barcode_response(response)
         products = response.json().get("products", [])
         return _barcode_lookup_to_candidate(products[0]) if products else None
 
     response = requests.get(UPCITEMDB_URL, params={"upc": barcode}, timeout=10)
-    response.raise_for_status()
+    _raise_for_barcode_response(response)
     items = response.json().get("items", [])
     return _upcitemdb_to_candidate(items[0]) if items else None
+
+
+def _raise_for_barcode_response(response):
+    if response.status_code == 429:
+        raise BarcodeRateLimitError("Barcode provider rate limit reached. Try again later or search by title.")
+    if response.status_code in (401, 403):
+        raise BarcodeLookupError("Barcode provider rejected the request. Check the API key or provider limit.")
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        raise BarcodeLookupError(f"Barcode provider failed with HTTP {response.status_code}.") from exc
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise BarcodeLookupError("Barcode provider returned a non-JSON response.") from exc
+
+    message = str(data.get("message") or data.get("error") or "")
+    code = str(data.get("code") or "")
+    if "limit" in message.lower() or "exceed" in message.lower() or code in {"TOO_FAST", "EXCEEDED"}:
+        raise BarcodeRateLimitError("Barcode provider rate limit reached. Try again later or search by title.")
 
 
 def is_physical_media_candidate(candidate):

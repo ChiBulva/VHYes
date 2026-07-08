@@ -64,6 +64,15 @@ CREATE TABLE IF NOT EXISTS images (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS barcode_cache (
+    barcode TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    payload TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_media_title ON media_items(title);
 CREATE INDEX IF NOT EXISTS idx_media_year ON media_items(release_year);
 CREATE INDEX IF NOT EXISTS idx_media_mood ON media_items(mood);

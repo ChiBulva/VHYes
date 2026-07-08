@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 
@@ -5,6 +6,7 @@ from flask import (
     Blueprint,
     current_app,
     flash,
+    has_request_context,
     redirect,
     render_template,
     request,
@@ -14,7 +16,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from .db import get_db, now_iso
-from .metadata import is_physical_media_candidate, lookup_barcode, search_open_library, search_tmdb, search_wikidata
+from .metadata import BarcodeLookupError, BarcodeRateLimitError, is_physical_media_candidate, lookup_barcode, search_open_library, search_tmdb, search_wikidata
 
 bp = Blueprint("vhyes", __name__)
 
@@ -97,8 +99,8 @@ def add_media():
             flash(f"Added {candidates[0].get('title', 'media')}.", "success")
             return redirect(url_for("vhyes.add_media"))
 
-        if not candidates:
-            flash("No physical media match found. Try the title instead of the barcode.", "warn")
+        if not candidates and not is_barcode:
+            flash("No title match found. Try a more specific title or scan a barcode.", "warn")
 
     if request.method == "POST" and request.form.get("add_action"):
         item_id = _save_media(request.form, request.files.get("cover_file"))
@@ -171,12 +173,34 @@ def _search_candidates(query):
         return []
 
     if _is_barcode_query(query):
-        candidate = lookup_barcode(
-            _clean_barcode(query),
-            current_app.config["BARCODE_LOOKUP_API_KEY"],
-        )
-        if not candidate or not is_physical_media_candidate(candidate):
+        barcode = _clean_barcode(query)
+        cached = _get_cached_barcode(barcode)
+        if cached:
+            if cached["status"] == "match":
+                return [_prepare_candidate(json.loads(cached["payload"]))]
+            _flash_if_possible(cached["error_message"] or "Cached barcode is not physical media.", "warn")
             return []
+
+        try:
+            candidate = lookup_barcode(
+                barcode,
+                current_app.config["BARCODE_LOOKUP_API_KEY"],
+            )
+        except BarcodeRateLimitError as exc:
+            _flash_if_possible(str(exc), "error")
+            return []
+        except BarcodeLookupError as exc:
+            _flash_if_possible(str(exc), "error")
+            return []
+
+        if not candidate:
+            _set_cached_barcode(barcode, "miss", None, "No barcode match found.")
+            return []
+        if not is_physical_media_candidate(candidate):
+            _set_cached_barcode(barcode, "non_media", candidate, "Barcode match was not physical media.")
+            return []
+
+        _set_cached_barcode(barcode, "match", candidate, None)
         return [_prepare_candidate(candidate)]
 
     candidates = []
@@ -184,6 +208,42 @@ def _search_candidates(query):
     candidates.extend(search_open_library(query))
     candidates.extend(search_wikidata(query))
     return [_prepare_candidate(candidate) for candidate in _dedupe_candidates(candidates)]
+
+
+def _flash_if_possible(message, category):
+    if has_request_context():
+        flash(message, category)
+
+
+def _get_cached_barcode(barcode):
+    return get_db().execute(
+        "SELECT * FROM barcode_cache WHERE barcode = ?",
+        (barcode,),
+    ).fetchone()
+
+
+def _set_cached_barcode(barcode, status, candidate, error_message):
+    now = now_iso()
+    get_db().execute(
+        """
+        INSERT INTO barcode_cache (barcode, status, payload, error_message, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(barcode) DO UPDATE SET
+            status = excluded.status,
+            payload = excluded.payload,
+            error_message = excluded.error_message,
+            updated_at = excluded.updated_at
+        """,
+        (
+            barcode,
+            status,
+            json.dumps(candidate) if candidate else None,
+            error_message,
+            now,
+            now,
+        ),
+    )
+    get_db().commit()
 
 
 def _dedupe_candidates(candidates):
