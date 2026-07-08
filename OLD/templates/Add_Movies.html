@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Add Movies - VHS Catalog App</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        /* Search results container */
+        #results {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .movie-card {
+        width: 300px;
+        height: 400px;
+        margin: 10px;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        display: flex; /* Use flex layout to align image and details vertically */
+        flex-direction: column; /* Stack image and details vertically */
+    }
+
+    .movie-card img {
+        max-width: 100%;
+        height: 100%;
+        display: block;
+        margin: auto;
+    }
+
+    .movie-details {
+        flex-grow: 1; /* Allow details to grow and occupy remaining space */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 10px;
+    }
+
+    .movie-title {
+        font-size: 1.2em;
+        margin-bottom: 5px;
+    }
+
+    .movie-year {
+        font-size: 14px;
+        color: #777;
+    }
+
+    .details-button {
+        background-color: #007BFF;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .details-button:hover {
+        background-color: #0056b3;
+    }
+        /* 'Full details' button styles */
+        .details-button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .details-button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .modal-content img {
+            max-width: 100%;
+            max-height: 400px;
+            height: auto;
+            display: block;
+            margin: auto;
+        }
+
+        /* Search box and button styles */
+        .input-group {
+            margin-top: 20px;
+        }
+
+        .form-control {
+            border-radius: 0;
+        }
+
+        .btn-primary {
+            border-radius: 0;
+        }/* Custom styles for search box and buttons */
+
+/* Style for the search box */
+#search {
+    width: 200px; /* Adjust the width as needed */
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Style for the search button */
+#search-button {
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    margin-left: 10px; /* Add margin to separate from the search box */
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+#search-button:hover {
+    background-color: #0056b3;
+}
+.saved-movie {
+        border-color: green;
+    }
+
+    </style>    
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</head>
+<body>
+
+    <!-- Search Box -->
+    <div class="input-group mb-3">
+        <!-- Back to Home Page -->
+        <a href="/">Back to Home</a>
+    </div>
+    <!-- Search Box -->
+    <div class="input-group mb-3">
+        <!-- Search Box -->
+        <input type="text" id="search" placeholder="Search for a movie" onkeypress="handleKeyPress(event)">
+        <button id="search-button" onclick="searchMovie()">Search</button>
+
+    </div>
+
+    <div id="movieModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modal-body">
+                <!-- Movie details will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+      
+    <!-- Results Area -->
+    <div id="results"></div>
+    <script>
+
+        function handleKeyPress(event) {
+            if (event.keyCode === 13) {
+                // Enter key was pressed, trigger the search
+                searchMovie();
+            }
+        }
+
+        let Mdata = {}
+        // Function to search for a movie
+        function searchMovie() {
+            let query = $("#search").val();
+            $.ajax({
+                url: '/search',
+                type: 'POST',
+                data: JSON.stringify({ query: query }),
+                contentType: 'application/json',  // Setting the content type
+                success: function(data) {
+                    $("#results").empty();
+                    data.forEach(movie => {
+                        $("#results").append(`
+                        <div class="movie-card">
+                            <img src="${movie.cover_url}" class="movie-image">
+                            <div class="movie-details">
+                                <h3 class="movie-title">${movie.title}</h3>
+                                <p class="movie-year">${movie.year}</p>
+                                <button class="details-button" onclick="getDetails('${movie.id}')">Full details</button>
+                                <button class="fast-add-button" onclick="fastAddMovieByImdbId('${movie.id}')">Fast Add</button>
+                            </div>
+                        </div>
+
+
+                        `);
+                    });
+                },
+                error: function(xhr, textStatus, error) {
+                    alert(xhr.status + ': ' + error);
+                }
+            });
+        }
+
+        function fastAddMovieByImdbId(imdbId) {
+            // Make an AJAX POST request to the Flask route with the IMDb ID
+            $.ajax({
+                url: '/fast-add-by-id',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ id: imdbId }),
+                success: function (response) {
+                    if (response.status === 'success') {
+                        // You can perform additional actions here if needed
+                    } else {
+                        alert('Failed to add the movie: ' + response.message);
+                    }
+                },
+                error: function (xhr, textStatus, error) {
+                    alert('Error: ' + xhr.status + ' - ' + error);
+                }
+            });
+        }
+
+        // Function to get full details of a movie
+        function getDetails(id) {
+            $.ajax({
+                url: '/details',
+                type: 'POST',
+                data: JSON.stringify({ id: id }),
+                contentType: 'application/json',
+                success: function (data) {
+                    Mdata = JSON.stringify(data)
+                    $("#modal-body").html(`
+                        <h3>${data.title} (${data.year})</h3>
+                        <button onclick='saveMovie()'>Save this</button>
+                        <img src="${data.image}" alt="${data.title}">
+                        <p><strong>Director:</strong> ${data.director.join(', ')}</p>
+                        <p><strong>Genre:</strong> ${data.genres.join(', ')}</p>
+                        <p><strong>Cast:</strong> ${data.cast.join(', ')}</p>
+                        <p><strong>Runtime:</strong> ${data.runtime.join(', ')}</p>
+                        <p><strong>Rating:</strong> ${data.rating}</p>
+                        <p><strong>Votes:</strong> ${data.votes}</p>
+                        <p><strong>Plot Outline:</strong> ${data['plot outline']}</p>
+                    `);
+
+                    // Display the modal
+                    $("#movieModal").css("display", "block");
+                },
+                error: function (xhr, textStatus, error) {
+                    alert(xhr.status + ': ' + error);
+                }
+            });
+        }
+
+
+        // Function to close the modal
+        $(".close").on("click", function() {
+        $("#movieModal").css("display", "none");
+        });
+
+        // Function to save movie details
+        function saveMovie() {
+            $.ajax({
+                url: '/save',
+                type: 'POST',
+                data: JSON.stringify(Mdata),
+                contentType: 'application/json',
+                success: function (response) {
+                    if (response.status === "success") {
+                        $("#movieModal").css("display", "none");          
+                    }
+                },
+                error: function (xhr, textStatus, error) {
+                    alert(xhr.status + ': ' + error);
+                }
+            });
+        }
+
+
+
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,88 @@
+{
+    "Books": [
+        {
+            "amazon_price": "Price not available",
+            "description": "The damned thing\n   The empty house\n   A ghost\n   The Consequences\n   An Old Woman's tale\n   How it Happened\n   The Shell of sense\n   The Secret of the growing gold\n   The signal-man\n   Ligeia\n   The Fullness of life\n   Playing with fire\n   Narrative of the ghost of the hand\n   The Facts in the case of M. Valdemar\n   My Platonic sweetheart\n   The Bold Dragoon, or The Adventure of my grandfather.\n",
+            "image_url": "//covers.openlibrary.org/b/id/10871161-M.jpg",
+            "isbn": "1609984838",
+            "language": "",
+            "pages": "1",
+            "publish_date": "Nov 01, 2011",
+            "publisher": "AudioGO",
+            "rating": "Rating not available",
+            "title": "Great Classic Ghost Stories",
+            "id": 1,
+            "author": "Ambrose Bierce"
+        },
+        {
+            "amazon_price": "$5.36",
+            "description": "From the Flap:\n",
+            "image_url": "//covers.openlibrary.org/b/id/12018533-M.jpg",
+            "isbn": "0375504397",
+            "language": "English",
+            "pages": "625",
+            "publish_date": "2001",
+            "publisher": "Random House",
+            "rating": "4.00",
+            "title": "Black House",
+            "id": 2,
+            "author": "Stephen King"
+        },
+        {
+            "amazon_price": "$5.00",
+            "description": "Kyle Barnes has been plagued by demonic possession all his life and now he needs answers. Unfortunately, what he uncovers along the way could bring about the end of life on Earth as we know it.\n",
+            "image_url": "//covers.openlibrary.org/b/id/13806750-M.jpg",
+            "isbn": "1632150530",
+            "language": "English",
+            "pages": "152",
+            "publish_date": "2015",
+            "publisher": "Image Comics",
+            "rating": "3.86",
+            "title": "Outcast",
+            "id": 4,
+            "author": "Robert Kirkman"
+        },
+        {
+            "amazon_price": "$7.83",
+            "author": "Kevin J. Anderson",
+            "description": "",
+            "image_url": "//covers.openlibrary.org/b/id/10533165-M.jpg",
+            "isbn": "1419731505",
+            "language": "",
+            "pages": "160",
+            "publish_date": "Nov 24, 2020",
+            "publisher": "Harry N. Abrams",
+            "rating": "5.00",
+            "title": "Dune",
+            "id": 4
+        },
+        {
+            "amazon_price": "$3.98",
+            "author": "Reader's Digest",
+            "description": "Reports facts and the most recent theories dealing with ancient civilizations, archaeological discoveries, unexplained catastrophes, and other mysteries from man's past, illustrating accounts with hundreds of photographs, paintings, and maps.\n",
+            "image_url": "//covers.openlibrary.org/b/id/10249747-M.jpg",
+            "isbn": "089577044X",
+            "language": "English",
+            "pages": "319",
+            "publish_date": "1977",
+            "publisher": "Reader's Digest",
+            "rating": "Rating not available",
+            "title": "The World's Last Mysteries",
+            "id": 5
+        },
+        {
+            "amazon_price": "$32.61",
+            "author": "Robert Kirkman",
+            "description": "Collecting the formative issues in the grown of Invincible as a superhero. This volume collects Invincible's violent battle with the villainous Angstrom Levy, his reunion with his estranged father and the bloody battle with the Viltrumites. This is a can't-miss for any Invincible fan and a perfect addition to any bookshelf.\n",
+            "image_url": "//covers.openlibrary.org/b/id/1944163-M.jpg",
+            "isbn": "1582407630",
+            "language": "English",
+            "pages": "336",
+            "publish_date": "June 27, 2007",
+            "publisher": "Image Comics",
+            "rating": "Rating not available",
+            "title": "Invincible - Ultimate Collection, Vol. 3",
+            "id": 6
+        }
+    ]
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="./static/css/styles.css"> <!-- You can create a separate CSS file for styling -->
+    <title>Home - VHS Catalog App</title>
+    <style>
+
+        /* Define separate containers for Movies and Books */
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        .section {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .section a {
+            text-decoration: none;
+        }
+
+
+        .movies-section a:hover {
+            background-color: white;
+            color: #007BFF;
+        }
+
+        .books-section a:hover {
+            background-color: white;
+            color: #FF4500;
+        }
+        .or{
+            background-color: white !important;
+        }
+        /* Add this CSS to your existing styles.css or within the <style> tags in your HTML */
+
+        .circle-button {
+            display: inline-block;
+            margin: 10px; /* Adjust the margin as needed for spacing */
+            border-radius: 50%; /* Makes the button circular */
+            overflow: hidden; /* Ensures the circular shape is maintained */
+        }
+        .circle-button a {
+            background-color: #0059ff;
+        }
+
+
+        
+        .or a {
+            background-color: #FF4500;
+        }
+        .circle-button a {
+            display: block;
+            width: 100px; /* Adjust the width as needed */
+            height: 100px; /* This makes it a perfect circle, adjust if needed */
+            color: white;
+            text-align: center;
+            line-height: 100px; /* Center text vertically */
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s, color 0.3s;
+        } 
+        .circle-button a:hover {
+            background-color: #FF4500;
+            color: #0059ff;
+        }  
+        .or a:hover {
+            background-color: #0059ff;
+            color: #FF4500;
+        }  
+    </style>
+</head>
+<body>
+    <h1>Welcome to the VHS Catalog App</h1>
+    <div class="container">
+        <!-- Movies section -->
+        <div class="section movies-section" onmouseover="changeBackground('Movies')">
+
+            <div class="circle-button or">
+                <a href="/catalog">Movies</a>
+            </div>
+            <div class="circle-button or">
+                <a href="/add_movies">Add Movies</a>
+            </div>
+        </div>
+        <!-- Books section -->
+        <div class="section books-section" onmouseover="changeBackground('Books')">
+            <div class="circle-button">
+                <a href="/books">Books</a>
+            </div>
+            <div class="circle-button">
+                <a href="/add_book">Add Books</a>
+            </div>
+        </div>
+        
+    </div>
+    <script>
+        function changeBackground(section) {
+            // Change the background image based on the section
+            if (section === 'Movies') {
+                document.querySelector('.container').style.backgroundImage = "url('/static/images/gifs/VHS.gif')";
+            } 
+            if (section === 'Books') {
+                document.querySelector('.container').style.backgroundImage = "url('/static/images/png/Books.png')";
+            }
+            // Change the background image for Movies section
+            
+        }
+    </script>
+</html>

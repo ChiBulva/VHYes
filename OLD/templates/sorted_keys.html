@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorted Keys</title>
+    <style>
+        ul {
+            columns: 3;
+            -webkit-columns: 3;
+            -moz-columns: 3;
+        }
+        li {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            margin-bottom: 10px;
+        }
+
+
+    </style>
+</head>
+<body>
+    <h1>Sorted Keys</h1>
+    <ul>
+        {% for key in keys %}
+            <li>{{ key }}</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

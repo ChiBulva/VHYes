@@ -1,0 +1,125 @@
+<!-- HTML Structure -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Books - Book Catalog App</title>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
+<body>
+
+    <!-- Search Box by ISBN -->
+    <div class="input-group mb-3">
+        <input type="text" id="isbn_search" placeholder="Search for a book by ISBN" onkeypress="handleKeyPress(event, 'isbn')">
+        <button onclick="searchByISBN()">Search by ISBN</button>
+    </div>
+
+    <div id="title"></div>
+    <div id="author"></div>
+    <div id="isbn"></div>
+    <div id="rating"></div>
+    <img id="image" >
+    <div id="publish_date"></div>
+    <div id="publisher"></div>
+    <div id="language"></div>
+    <div id="pages"></div>
+    <div id="amazon_price"></div>
+    <div id="description"></div>
+    <button id="saveBookButton" onclick="saveBook()" style="display:none;">Save Book</button>
+
+
+    <script>
+        let currentBookData = null; // To store the latest book data
+        function saveBook() {
+            if (currentBookData) {
+                fetch('/save_book', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(currentBookData),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            }
+        }
+
+        function handleKeyPress(event, type) {
+            if (event.keyCode === 13) {
+                if (type === 'isbn') {
+                    searchByISBN();
+                } else {
+                    searchByTitle();
+                }
+            }
+        }
+
+        // Search by ISBN
+        function searchByISBN() {
+
+            let isbn = document.getElementById("isbn_search").value;
+            //alert(isbn);
+            fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json`)
+            .then(response => response.json())
+            .then(data => { 
+                console.log(data)
+                console.log(data[`ISBN:${isbn}`])
+                populateResultsISBN(data[`ISBN:${isbn}`])
+                
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // Search by Title
+        function searchByTitle() {
+            let title = document.getElementById("title_search").value;
+            fetch(`https://openlibrary.org/search.json?title=${title}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.docs && data.docs.length > 0) {
+                    populateResultsTitle(data.docs[0]);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function populateResultsISBN(bookData) {
+            let payload = {
+                url: bookData['info_url']
+            };
+
+            fetch('/get_info', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data)
+                document.getElementById("rating").innerHTML = `Rating: ${data.rating}`;
+                document.getElementById("image").src = data.image_url;
+                document.getElementById("publish_date").innerHTML = `Publish Date: ${data.publish_date}`;
+                document.getElementById("publisher").innerHTML = `Publisher: ${data.publisher}`;
+                document.getElementById("language").innerHTML = `Language: ${data.language}`;
+                document.getElementById("pages").innerHTML = `Pages: ${data.pages}`;
+                document.getElementById("amazon_price").innerHTML = `Amazon Price: ${data.amazon_price}`;
+                document.getElementById("description").innerHTML = `Description: ${data.description}`;            
+                document.getElementById("title").innerHTML = `Title: ${data.title}`;
+                document.getElementById("isbn").innerHTML = `ISBN: ${data.isbn}`;
+                document.getElementById("author").innerHTML = `Author: ${data.author}`;
+                currentBookData = data;  // Save the current book data
+            })
+            .catch(error => {
+                console.error('Error fetching info:', error);
+            });
+            document.getElementById("saveBookButton").style.display = "block";
+        }
+    </script>
+</body>
+</html>

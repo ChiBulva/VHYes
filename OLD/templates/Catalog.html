@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head> 
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <meta charset="UTF-8">
+    <title>Catalog</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .card {
+            margin-bottom: 20px;
+        }
+        .card-img-top {
+            height: 100%;
+            object-fit: cover;
+        }
+        .card-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .wide-modal .modal-dialog {
+            max-width: 80%;
+        }
+        .custom-thick-border  {
+            border: 4px solid #28a745; /* Adjust the thickness and color as needed */
+            border-radius: 10px; /* Optional: Add rounded corners */
+        }
+        #movie-card-section {
+            /* Add your styles here */
+            padding: 20px; /* Add padding to the section */
+            background-color: #f0f0f0; /* Set a background color */
+            border: 1px solid #ddd; /* Add a border around the section */
+            border-radius: 5px; /* Add border radius for rounded corners */
+        }
+
+    </style>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+</head>
+<body>    <!-- Search Box -->
+    <div class="input-group mb-3">
+        <!-- Back to Home Page -->
+        <a href="/">Back to Home</a>
+    </div>
+    <div class="container mt-5">
+        <h1>Movie Catalog</h1>
+        <!-- Genre filter dropdown -->
+        <div class="form-group">
+            <select class="form-control" id="genreFilter">
+                <option value="">All Genres</option>
+                {% for genre in genres %}
+                    <option value="{{ genre }}">{{ genre }}</option>
+                {% endfor %}
+            </select>
+            
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4">
+                <!-- Rating filter slider here -->
+                <input type="range" class="form-range" id="ratingFilter" min="0" max="10" step="0.1" value="2">
+                <span id="ratingValue">2</span>
+            </div>
+            <div class="col-md-4">
+                <!-- Year filter start input here -->
+                <input type="number" class="form-control" id="yearFilterStart" placeholder="Start Year">
+            </div>
+            <div class="col-md-4">
+                <!-- Year filter end input here -->
+                <input type="number" class="form-control" id="yearFilterEnd" placeholder="End Year">
+            </div>
+        </div>
+        
+        <div class="form-group">
+        </div>
+        <!-- Search bar -->
+        <div class="form-group">
+            <input type="text" class="form-control" id="searchBar" placeholder="Search by title">
+        </div>
+
+        <div id="movie-card-section">
+            <button id="randomMovieBtn" class="btn btn-primary">Random Movie</button>
+            <br>
+            <br>
+            <div class="row" id="movie-container">
+                <!-- Movie cards will be appended here -->
+                {% for movie in movies %}
+                <div class="col-md-3 ">
+                    <div class="card" data-toggle="modal" data-target="#movieModal{{ loop.index0 }}">
+                        <div class="card-header">
+                            <h5 class="card-title">{{ movie.title }}</h5>
+                            <p>{{ movie.year }} | Rating: {{ movie.rating }}</p>
+                        </div>
+                        <img src="{{ movie.image }}" class="card-img-top">
+                        <button class="btn btn-danger delete-movie-btn" data-movie-id="{{ movie.id }}">Delete</button>                </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+
+        <!-- Initial Modal -->
+        <div class="modal fade" id="movieModal" tabindex="-1" aria-labelledby="movieModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="movieModalLabel">Movie Title</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-5">
+                                <img src="" id="modal-image" class="img-fluid mb-3">
+                            </div>
+                            <div class="col-md-5">
+                                <p><strong>Year:</strong> <span id="modal-year"></span></p>
+                                <p><strong>Director:</strong> <span id="modal-director"></span></p>
+                                <p><strong>Rating:</strong> <span id="modal-rating"></span></p>
+                                <p><strong>Genres:</strong> <span id="modal-genres"></span></p>
+                                <p><strong>Plot:</strong> <span id="modal-plot"></span></p>
+                                <p><strong>Cast:</strong> <span id="modal-cast"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script>
+
+        $(document).ready(function() {
+            // Select the rating slider and rating value elements
+            const ratingSlider = $("#ratingFilter");
+            const ratingValue = $("#ratingValue");
+
+            // Initialize the rating value to the default (2)
+            ratingValue.text(ratingSlider.val());
+
+            // Add an event listener to update the rating value when the slider changes
+            ratingSlider.on("input", function() {
+                ratingValue.text($(this).val());
+            });
+        });
+
+        // Add an event listener for the delete button clicks
+        $(document).on('click', '.delete-movie-btn', function() {
+            // Get the movie ID from the data attribute
+            let movieId = $(this).data('movie-id');
+
+            // Confirm with the user before deleting
+            if (confirm("Are you sure you want to delete this movie?")) {
+                // Make a POST request to delete the movie with the specified ID
+                $.post(`/delete_movie/${movieId}`, function(data) {
+                    if (data.success) {
+                        // Successfully deleted the movie, you can update the UI as needed
+                        // For example, remove the movie card from the page
+                        $(this).closest('.card').remove();
+                        window.location.href = window.location.pathname
+                    } else {
+                        // Handle any errors or display a message
+                        alert("Failed to delete the movie.");
+                    }
+                });
+            }
+        });
+
+        // Add a click event listener to the "Random Movie" button
+        $('#randomMovieBtn').click(function() {
+            // Get all the movie cards that match the current filter criteria
+            let filteredMovieCards = $('.card');
+            const elementsWithClass = document.querySelectorAll('.custom-thick-border');
+    
+            elementsWithClass.forEach((element) => {
+                element.classList.remove('custom-thick-border');
+            });
+            // Check if there are any filtered movie cards
+            if (filteredMovieCards.length === 0) {
+                alert("No movies match the selected criteria.");
+                return;
+            }
+
+            // Generate a random index to pick a random movie card
+            let randomIndex = Math.floor(Math.random() * filteredMovieCards.length);
+
+            // Get the random movie card
+            let randomMovieCard = filteredMovieCards.eq(randomIndex);
+
+            // Display the random movie card (or perform any desired action)
+            // You can use Bootstrap modal or any other method to display it
+            // For simplicity, we will just highlight the card
+            randomMovieCard.addClass('custom-thick-border'); // Add a border to highlight it
+
+            // Scroll to the randomly selected movie card (optional)
+            $('html, body').animate({
+                scrollTop: randomMovieCard.offset().top - 100 // Adjust as needed
+            }, 1000);
+        });
+
+        // Function to make a POST request to get filtered movies
+        function getFilteredMovies() {
+            const searchBar = $("#searchBar").val();
+            const genreFilter = $("#genreFilter").val();
+            const ratingFilter = $("#ratingFilter").val();
+            const yearFilterStart = $("#yearFilterStart").val(); // Get the start year filter value
+            const yearFilterEnd = $("#yearFilterEnd").val(); // Get the end year filter value
+
+
+            $.post("/get_movies_filtered", { title: searchBar, genre: genreFilter, rating: ratingFilter, yearFilterStart: yearFilterStart, yearFilterEnd: yearFilterEnd, }, function(data) {
+                let movies = data.movies;
+                
+
+                // Sort the movies array by title alphabetically
+                movies.sort((a, b) => a.title.localeCompare(b.title));
+                width_toggle = 3
+
+                // Clear existing movie cards
+                $("#movie-container").html("");
+
+                // Populate movie cards
+                movies.forEach((movie, index) => {
+                    let cardHtml = `
+                        <div class="col-md-${width_toggle}">
+                            <div class="card" data-toggle="modal" data-target="#movieModal${index}">
+                                <div class="card-header">
+                                    <h5 class="card-title">${movie.title}</h5>
+                                    <p>${movie.year} | Rating: ${movie.rating}</p>
+                                </div>
+                                <img src="${movie.image}" class="card-img-top">
+                                <button class="btn btn-danger delete-movie-btn" data-movie-id="${ movie.id }">Delete</button>                </div>
+                            </div>
+                        </div>
+
+                        <!-- Modified Modal -->
+                        <div class="modal fade wide-modal" id="movieModal${index}" tabindex="-1" aria-labelledby="movieModalLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="movieModalLabel">${movie.title}</h5>
+                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <img src="${movie.image}" class="img-fluid mb-3">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p><strong>Year:</strong> ${movie.year}</p>
+                                                <p><strong>Director:</strong> ${movie.director}</p>
+                                                <p><strong>Rating:</strong> ${movie.rating}</p>
+                                                <p><strong>Genres:</strong> ${movie.genres.join(", ")}</p>
+                                                <p><strong>Plot:</strong> ${movie.plot_outline}</p>
+                                                <p><strong>Cast:</strong> ${movie.cast}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    $("#movie-container").append(cardHtml);
+                });
+            });
+        }
+        $("#searchBar, #genreFilter, #ratingFilter, #yearFilterStart, #yearFilterEnd").on("input", getFilteredMovies);
+
+        // Initial call to load all movies
+        
+        getFilteredMovies()
+    </script>
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
