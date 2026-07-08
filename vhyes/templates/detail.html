@@ -37,6 +37,9 @@
             <div><dt>Shelf</dt><dd>{{ item.shelf_location or "Unplaced" }}</dd></div>
             <div><dt>Image source</dt><dd>{{ item.source_name or "Manual" }}</dd></div>
         </dl>
+        <form class="danger-zone" method="post" action="{{ url_for('vhyes.delete_media', item_id=item.id) }}" onsubmit="return confirm('Remove {{ item.title|e }} from VHYes?');">
+            <button class="button danger" type="submit">Remove Media</button>
+        </form>
     </section>
 </article>
 {% endblock %}

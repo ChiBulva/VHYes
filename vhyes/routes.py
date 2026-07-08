@@ -137,6 +137,20 @@ def detail(item_id):
     return render_template("detail.html", item=item, genres=[g["name"] for g in genres])
 
 
+@bp.route("/media/<int:item_id>/delete", methods=("POST",))
+def delete_media(item_id):
+    db = get_db()
+    item = db.execute("SELECT title FROM media_items WHERE id = ?", (item_id,)).fetchone()
+    if item is None:
+        flash("That media item was already gone.", "warn")
+        return redirect(url_for("vhyes.library"))
+
+    db.execute("DELETE FROM media_items WHERE id = ?", (item_id,))
+    db.commit()
+    flash(f"Removed {item['title']}.", "success")
+    return redirect(url_for("vhyes.library"))
+
+
 @bp.route("/covers/<path:filename>")
 def cover_file(filename):
     return send_from_directory(current_app.config["COVERS_DIR"], filename)
