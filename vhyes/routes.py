@@ -20,6 +20,7 @@ from .db import get_db, now_iso
 from .metadata import (
     BarcodeLookupError,
     BarcodeRateLimitError,
+    enrich_barcode_candidate,
     is_physical_media_candidate,
     lookup_barcode,
     search_open_library,
@@ -364,7 +365,11 @@ def _search_candidates(query):
         cached = _get_cached_barcode(barcode)
         if cached:
             if cached["status"] == "match":
-                return [_prepare_candidate(json.loads(cached["payload"]))]
+                candidate = json.loads(cached["payload"])
+                enriched = enrich_barcode_candidate(candidate, current_app.config["TMDB_API_KEY"])
+                if enriched != candidate:
+                    _set_cached_barcode(barcode, "match", enriched, None)
+                return [_prepare_candidate(enriched)]
             _flash_if_possible(cached["error_message"] or "Cached barcode is not physical media.", "warn")
             return []
 
@@ -387,6 +392,7 @@ def _search_candidates(query):
             _set_cached_barcode(barcode, "non_media", candidate, "Barcode match was not physical media.")
             return []
 
+        candidate = enrich_barcode_candidate(candidate, current_app.config["TMDB_API_KEY"])
         _set_cached_barcode(barcode, "match", candidate, None)
         return [_prepare_candidate(candidate)]
 
@@ -701,7 +707,7 @@ def _candidate_to_save_data(candidate):
     data.setdefault("source_url", data.get("remote_url") or "")
     data.setdefault(
         "license_note",
-        f"Remote image URL stored from {data.get('source_name') or 'metadata source'}; not cached locally.",
+        f"Remote image URL stored from {data.get('source_name') or data.get('barcode_source_name') or 'metadata source'}; not cached locally.",
     )
     data["raw_payload"] = _raw_payload_text(data.get("raw_payload"))
     return data

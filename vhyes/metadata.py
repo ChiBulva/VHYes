@@ -185,6 +185,111 @@ def search_open_library(query):
     return results
 
 
+def enrich_barcode_candidate(candidate, tmdb_api_key=""):
+    if not candidate:
+        return candidate
+    if candidate.get("barcode_source_name") or candidate.get("source_name") not in {"upcitemdb", "barcodelookup"}:
+        return candidate
+
+    query = clean_media_search_title(candidate.get("title", ""))
+    if not query:
+        return candidate
+
+    enriched = []
+    if candidate.get("media_kind") == "movie":
+        enriched.extend(search_tmdb(query, tmdb_api_key))
+        enriched.extend(search_wikidata(query))
+    elif candidate.get("media_kind") in {"book", "magazine", "audiobook"}:
+        enriched.extend(search_open_library(query))
+    else:
+        enriched.extend(search_tmdb(query, tmdb_api_key))
+        enriched.extend(search_wikidata(query))
+        enriched.extend(search_open_library(query))
+
+    best = _best_enrichment_match(query, enriched)
+    if not best:
+        candidate = dict(candidate)
+        candidate["enrichment_query"] = query
+        return candidate
+
+    merged = dict(candidate)
+    barcode_source = {
+        "source_name": candidate.get("source_name"),
+        "source_id": candidate.get("source_id"),
+        "source_url": candidate.get("source_url"),
+        "raw_payload": candidate.get("raw_payload"),
+    }
+    merged.update(
+        {
+            "title": best.get("title") or candidate.get("title"),
+            "media_kind": best.get("media_kind") or candidate.get("media_kind"),
+            "release_year": best.get("release_year") or candidate.get("release_year"),
+            "summary": best.get("summary") or candidate.get("summary"),
+            "rating": best.get("rating") or candidate.get("rating"),
+            "remote_url": best.get("remote_url") or candidate.get("remote_url"),
+            "source_name": best.get("source_name") or candidate.get("source_name"),
+            "source_id": best.get("source_id") or candidate.get("source_id"),
+            "source_url": best.get("source_url") or candidate.get("source_url"),
+            "confidence": best.get("confidence") or candidate.get("confidence"),
+            "enrichment_query": query,
+            "barcode_source_name": barcode_source["source_name"],
+            "barcode_source_id": barcode_source["source_id"],
+            "barcode_source_url": barcode_source["source_url"],
+            "raw_payload": {
+                "barcode_source": barcode_source,
+                "enrichment_source": best.get("raw_payload"),
+                "enrichment_query": query,
+            },
+        }
+    )
+    return merged
+
+
+def clean_media_search_title(title):
+    title = clean_barcode_title(title)
+    title = re.sub(r"\b(disney|walt disney|mgm/ua|studios?)\b", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\([^)]*(anniversary|edition|special|widescreen|fullscreen|collector|collectors|limited)[^)]*\)", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\b(vhs|dvd|blu[- ]?ray|4k|uhd|ultra hd|video tape|videotape|cassette|disc|disk)\b", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\b(anniversary|edition|special|widescreen|fullscreen|collector'?s?|limited)\b", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\b(sequel|part)\b\s*\d*", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\b(18|19|20)\d{2}\b", "", title)
+    title = re.sub(r"\s+", " ", title).strip(" -:|")
+    if "milo" in title.lower() and "return" in title.lower() and ":" not in title:
+        title = re.sub(r"\bAtlantis\b\s+", "Atlantis: ", title, flags=re.IGNORECASE)
+    return title.strip()
+
+
+def _best_enrichment_match(query, candidates):
+    if not candidates:
+        return None
+
+    query_tokens = _title_tokens(query)
+    ranked = []
+    for candidate in candidates:
+        title = candidate.get("title") or ""
+        title_tokens = _title_tokens(title)
+        if not title_tokens:
+            continue
+        overlap = len(query_tokens & title_tokens)
+        if query_tokens and overlap < max(1, min(2, len(query_tokens))):
+            continue
+        ranked.append((overlap, bool(candidate.get("release_year")), bool(candidate.get("summary")), candidate))
+
+    if not ranked:
+        return None
+    ranked.sort(key=lambda item: item[:3], reverse=True)
+    return ranked[0][3]
+
+
+def _title_tokens(value):
+    stop = {"the", "a", "an", "and", "of", "part", "sequel", "video", "tape"}
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", (value or "").lower())
+        if token not in stop and len(token) > 1
+    }
+
+
 def lookup_barcode(barcode, barcode_lookup_key=""):
     barcode = (barcode or "").strip()
     if not barcode:
