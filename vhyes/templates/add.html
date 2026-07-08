@@ -8,7 +8,7 @@
     <h1>Scan a barcode or type a title.</h1>
     <form class="scan-box" method="post" autocomplete="off" data-scan-form>
         <input type="hidden" name="search_action" value="1">
-        <input id="scan-query" name="query" value="{{ query }}" placeholder="Scan barcode or type title" inputmode="search" autofocus data-scan-input>
+        <input id="scan-query" name="query" value="" placeholder="Scan barcode or type title" inputmode="search" autofocus data-scan-input>
         <label class="toggle-line">
             <input id="auto-add-single" type="checkbox" name="auto_add_single" value="1" {% if auto_add_single %}checked{% endif %} data-auto-add-toggle>
             <span>Auto-add one barcode match</span>
@@ -17,6 +17,26 @@
     </form>
 </section>
 
+{% if last_added %}
+<section class="last-added" aria-live="polite">
+    <div class="poster last-added-poster">
+        {% if last_added.local_path %}
+            <img src="{{ url_for('vhyes.cover_file', filename=last_added.local_path) }}" alt="">
+        {% elif last_added.remote_url %}
+            <img src="{{ last_added.remote_url }}" alt="">
+        {% else %}
+            <span>{{ last_added.title[:1] }}</span>
+        {% endif %}
+    </div>
+    <div>
+        <p class="eyebrow">Just added</p>
+        <h2>{{ last_added.title }}</h2>
+        <p>{{ last_added.release_year or "Unknown year" }}{% if last_added.format_name %} · {{ last_added.format_name }}{% endif %}</p>
+        <a href="{{ url_for('vhyes.detail', item_id=last_added.id) }}">View item</a>
+    </div>
+</section>
+
+{% endif %}
 {% if candidates %}
     <section class="results-section">
         <p class="result-count">{{ candidates|length }} possible match{% if candidates|length != 1 %}es{% endif %}</p>
@@ -98,12 +118,36 @@
         });
     }
 
-    if (input) {
+    function readyScanner(options) {
+        if (!input) {
+            return;
+        }
+
+        if (options && options.clear) {
+            input.value = '';
+        }
+
         window.setTimeout(function () {
             input.focus({ preventScroll: true });
             input.select();
         }, 50);
     }
+
+    readyScanner({ clear: true });
+
+    window.addEventListener('pageshow', function () {
+        readyScanner({ clear: true });
+    });
+
+    window.addEventListener('focus', function () {
+        readyScanner({ clear: false });
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            readyScanner({ clear: false });
+        }
+    });
 })();
 </script>
 {% endblock %}

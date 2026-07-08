@@ -495,3 +495,50 @@ label {
         width: 100%;
     }
 }
+
+
+.last-added {
+    display: grid;
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    max-width: 760px;
+    margin: -8px 0 28px;
+    padding: 12px;
+    border: 1px solid var(--accent);
+    background: rgba(15, 107, 95, 0.08);
+}
+
+.last-added-poster {
+    width: 86px;
+    min-height: 128px;
+}
+
+.last-added h2 {
+    margin-bottom: 6px;
+    font-size: 1.4rem;
+    line-height: 1.08;
+}
+
+.last-added p:not(.eyebrow) {
+    margin-bottom: 8px;
+    color: var(--muted);
+}
+
+.last-added a {
+    color: var(--accent-strong);
+    font-family: Verdana, sans-serif;
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+@media (max-width: 560px) {
+    .last-added {
+        grid-template-columns: 72px minmax(0, 1fr);
+    }
+
+    .last-added-poster {
+        width: 72px;
+        min-height: 108px;
+    }
+}

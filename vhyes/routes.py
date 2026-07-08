@@ -97,7 +97,7 @@ def add_media():
         if is_barcode and auto_add_single and len(candidates) == 1:
             item_id = _save_media(_candidate_to_save_data(candidates[0]), None)
             flash(f"Added {candidates[0].get('title', 'media')}.", "success")
-            return redirect(url_for("vhyes.add_media"))
+            return redirect(url_for("vhyes.add_media", added=item_id))
 
         if not candidates and not is_barcode:
             flash("No title match found. Try a more specific title or scan a barcode.", "warn")
@@ -105,15 +105,35 @@ def add_media():
     if request.method == "POST" and request.form.get("add_action"):
         item_id = _save_media(request.form, request.files.get("cover_file"))
         flash(f"Added {request.form.get('title', 'media')}.", "success")
-        return redirect(url_for("vhyes.add_media"))
+        return redirect(url_for("vhyes.add_media", added=item_id))
 
     return render_template(
         "add.html",
         auto_add_single=auto_add_single,
         candidates=candidates,
         formats=_formats(),
+        last_added=_get_added_preview(request.args.get("added")),
         query=query,
     )
+
+
+def _get_added_preview(item_id):
+    item_id = _int_or_none(item_id)
+    if not item_id:
+        return None
+
+    return get_db().execute(
+        """
+        SELECT mi.id, mi.title, mi.release_year, f.name AS format_name,
+               img.local_path, img.remote_url
+        FROM media_items mi
+        LEFT JOIN physical_copies pc ON pc.media_item_id = mi.id
+        LEFT JOIN formats f ON f.id = pc.format_id
+        LEFT JOIN images img ON img.media_item_id = mi.id AND img.image_type = 'cover'
+        WHERE mi.id = ?
+        """,
+        (item_id,),
+    ).fetchone()
 
 
 @bp.route("/media/<int:item_id>")
