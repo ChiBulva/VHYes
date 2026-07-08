@@ -3,15 +3,15 @@
 {% block title %}Add Media - VHYes{% endblock %}
 
 {% block content %}
-<section class="scan-stage">
+<section class="scan-stage" data-scanner-stage>
     <p class="eyebrow">Add media</p>
     <h1>Scan a barcode or type a title.</h1>
-    <form class="scan-box" method="post" autocomplete="off">
+    <form class="scan-box" method="post" autocomplete="off" data-scan-form>
         <input type="hidden" name="search_action" value="1">
-        <input name="query" value="{{ query }}" placeholder="027616165633 or The Wizard of Oz" inputmode="search" autofocus>
+        <input id="scan-query" name="query" value="{{ query }}" placeholder="Scan barcode or type title" inputmode="search" autofocus data-scan-input>
         <label class="toggle-line">
-            <input type="checkbox" name="auto_add_single" value="1" {% if auto_add_single %}checked{% endif %}>
-            Auto-add one barcode match
+            <input id="auto-add-single" type="checkbox" name="auto_add_single" value="1" {% if auto_add_single %}checked{% endif %} data-auto-add-toggle>
+            <span>Auto-add one barcode match</span>
         </label>
         <button class="button primary" type="submit">Search</button>
     </form>
@@ -73,4 +73,37 @@
         </div>
     </section>
 {% endif %}
+
+<script>
+(function () {
+    const input = document.querySelector('[data-scan-input]');
+    const toggle = document.querySelector('[data-auto-add-toggle]');
+    const form = document.querySelector('[data-scan-form]');
+    const storageKey = 'vhyes.autoAddSingleBarcode';
+
+    if (toggle) {
+        const savedValue = window.localStorage.getItem(storageKey);
+        if (savedValue !== null) {
+            toggle.checked = savedValue === 'true';
+        }
+
+        toggle.addEventListener('change', function () {
+            window.localStorage.setItem(storageKey, toggle.checked ? 'true' : 'false');
+        });
+    }
+
+    if (form && toggle) {
+        form.addEventListener('submit', function () {
+            window.localStorage.setItem(storageKey, toggle.checked ? 'true' : 'false');
+        });
+    }
+
+    if (input) {
+        window.setTimeout(function () {
+            input.focus({ preventScroll: true });
+            input.select();
+        }, 50);
+    }
+})();
+</script>
 {% endblock %}
