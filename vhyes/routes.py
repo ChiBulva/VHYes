@@ -83,6 +83,46 @@ def library():
     )
 
 
+@bp.route("/settings/database", methods=("GET", "POST"))
+def database_settings():
+    counts = _database_counts()
+
+    if request.method == "POST":
+        if request.form.get("confirm", "").strip() != "DELETE":
+            flash("Type DELETE to reset the local database.", "error")
+            return render_template("database_settings.html", counts=counts)
+
+        _reset_catalog_data()
+        flash("Local catalog database was reset.", "success")
+        return redirect(url_for("vhyes.database_settings"))
+
+    return render_template("database_settings.html", counts=counts)
+
+
+def _database_counts():
+    db = get_db()
+    return {
+        "media_items": db.execute("SELECT COUNT(*) FROM media_items").fetchone()[0],
+        "physical_copies": db.execute("SELECT COUNT(*) FROM physical_copies").fetchone()[0],
+        "images": db.execute("SELECT COUNT(*) FROM images").fetchone()[0],
+        "barcode_cache": db.execute("SELECT COUNT(*) FROM barcode_cache").fetchone()[0],
+    }
+
+
+def _reset_catalog_data():
+    db = get_db()
+    for table in (
+        "images",
+        "media_genres",
+        "genres",
+        "physical_copies",
+        "media_items",
+        "barcode_cache",
+    ):
+        db.execute(f"DELETE FROM {table}")
+    db.commit()
+
+
 @bp.route("/add", methods=("GET", "POST"))
 def add_media():
     query = ""

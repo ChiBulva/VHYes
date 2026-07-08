@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Database Settings - VHYes{% endblock %}
+
+{% block content %}
+<section class="page-heading">
+    <div>
+        <p class="eyebrow">Local database</p>
+        <h1>Reset the local catalog.</h1>
+    </div>
+</section>
+
+<section class="settings-panel">
+    <dl class="facts">
+        <div><dt>Media items</dt><dd>{{ counts.media_items }}</dd></div>
+        <div><dt>Physical copies</dt><dd>{{ counts.physical_copies }}</dd></div>
+        <div><dt>Images</dt><dd>{{ counts.images }}</dd></div>
+        <div><dt>Barcode cache</dt><dd>{{ counts.barcode_cache }}</dd></div>
+    </dl>
+
+    <form class="reset-form" method="post">
+        <label>
+            Type DELETE to reset catalog data
+            <input name="confirm" autocomplete="off" placeholder="DELETE">
+        </label>
+        <button class="button danger" type="submit">Reset Database</button>
+    </form>
+</section>
+{% endblock %}
