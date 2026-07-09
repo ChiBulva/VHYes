@@ -3,6 +3,7 @@ import os
 from flask import Flask
 
 from .db import close_db, init_db
+from .imdb_reference import import_imdb_command
 from .routes import bp
 
 
@@ -14,6 +15,7 @@ def create_app(test_config=None):
         SECRET_KEY=os.environ.get("VHYES_SECRET_KEY", "dev-vhyes"),
         TMDB_API_KEY=os.environ.get("TMDB_API_KEY", ""),
         BARCODE_LOOKUP_API_KEY=os.environ.get("BARCODE_LOOKUP_API_KEY", ""),
+        IMDB_DATA_DIR=os.environ.get("IMDB_DATA_DIR", os.path.join(app.root_path, "db")),
     )
 
     if test_config:
@@ -24,6 +26,7 @@ def create_app(test_config=None):
 
     app.teardown_appcontext(close_db)
     app.register_blueprint(bp)
+    app.cli.add_command(import_imdb_command)
 
     with app.app_context():
         init_db()

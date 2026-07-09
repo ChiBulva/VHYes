@@ -71,6 +71,35 @@ CREATE TABLE IF NOT EXISTS images (
     created_at TEXT NOT NULL
 );
 
+
+CREATE TABLE IF NOT EXISTS imdb_titles (
+    tconst TEXT PRIMARY KEY,
+    title_type TEXT NOT NULL,
+    primary_title TEXT NOT NULL,
+    original_title TEXT,
+    start_year INTEGER,
+    runtime_minutes INTEGER,
+    genres TEXT,
+    average_rating REAL,
+    num_votes INTEGER,
+    imported_at TEXT NOT NULL
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS imdb_title_fts USING fts5(
+    tconst UNINDEXED,
+    title,
+    primary_title UNINDEXED,
+    title_type UNINDEXED,
+    tokenize = 'unicode61 remove_diacritics 2'
+);
+
+CREATE TABLE IF NOT EXISTS imdb_imports (
+    source TEXT PRIMARY KEY,
+    source_path TEXT NOT NULL,
+    row_count INTEGER NOT NULL,
+    imported_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS barcode_cache (
     barcode TEXT PRIMARY KEY,
     status TEXT NOT NULL,
@@ -120,6 +149,9 @@ CREATE INDEX IF NOT EXISTS idx_media_mood ON media_items(mood);
 CREATE INDEX IF NOT EXISTS idx_copies_barcode ON physical_copies(barcode);
 CREATE INDEX IF NOT EXISTS idx_metadata_sources_item ON metadata_sources(media_item_id);
 CREATE INDEX IF NOT EXISTS idx_external_links_item ON external_links(media_item_id);
+
+CREATE INDEX IF NOT EXISTS idx_imdb_titles_year ON imdb_titles(start_year);
+CREATE INDEX IF NOT EXISTS idx_imdb_titles_votes ON imdb_titles(num_votes);
 """
 
 DEFAULT_FORMATS = [

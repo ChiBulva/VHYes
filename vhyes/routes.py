@@ -17,6 +17,7 @@ from flask import (
 from werkzeug.utils import secure_filename
 
 from .db import get_db, now_iso
+from .imdb_reference import enrich_candidate_from_local_imdb, search_local_imdb
 from .metadata import (
     BarcodeLookupError,
     BarcodeRateLimitError,
@@ -367,6 +368,7 @@ def _search_candidates(query):
         if cached:
             if cached["status"] == "match":
                 candidate = json.loads(cached["payload"])
+                candidate = enrich_candidate_from_local_imdb(candidate)
                 enriched = enrich_barcode_candidate(candidate, current_app.config["TMDB_API_KEY"])
                 if enriched != candidate:
                     _set_cached_barcode(barcode, "match", enriched, None)
@@ -393,15 +395,17 @@ def _search_candidates(query):
             _set_cached_barcode(barcode, "non_media", candidate, "Barcode match was not physical media.")
             return []
 
+        candidate = enrich_candidate_from_local_imdb(candidate)
         candidate = enrich_barcode_candidate(candidate, current_app.config["TMDB_API_KEY"])
         _set_cached_barcode(barcode, "match", candidate, None)
         return [_prepare_candidate(candidate)]
 
-    candidates = []
-    candidates.extend(search_tmdb(query, current_app.config["TMDB_API_KEY"]))
-    candidates.extend(search_imdb(query))
-    candidates.extend(search_wikidata(query))
-    candidates.extend(search_open_library(query))
+    candidates = search_local_imdb(query)
+    if not candidates:
+        candidates.extend(search_tmdb(query, current_app.config["TMDB_API_KEY"]))
+        candidates.extend(search_imdb(query))
+        candidates.extend(search_wikidata(query))
+        candidates.extend(search_open_library(query))
     return [_prepare_candidate(candidate) for candidate in _dedupe_candidates(candidates)]
 
 

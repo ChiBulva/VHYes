@@ -11,3 +11,5 @@ instance/
 *.sqlite3
 *.db
 *.log
+# Local IMDb TSV datasets; rebuildable, too large for git.
+vhyes/db/
