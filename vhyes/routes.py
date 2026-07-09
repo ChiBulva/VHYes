@@ -23,6 +23,7 @@ from .metadata import (
     enrich_barcode_candidate,
     is_physical_media_candidate,
     lookup_barcode,
+    search_imdb,
     search_open_library,
     search_tmdb,
     search_wikidata,
@@ -398,8 +399,9 @@ def _search_candidates(query):
 
     candidates = []
     candidates.extend(search_tmdb(query, current_app.config["TMDB_API_KEY"]))
-    candidates.extend(search_open_library(query))
+    candidates.extend(search_imdb(query))
     candidates.extend(search_wikidata(query))
+    candidates.extend(search_open_library(query))
     return [_prepare_candidate(candidate) for candidate in _dedupe_candidates(candidates)]
 
 
@@ -722,6 +724,8 @@ def _prepare_candidate(candidate):
     candidate.setdefault("barcode", "")
     candidate.setdefault("summary", "")
     candidate.setdefault("rating", "")
+    candidate.setdefault("runtime_minutes", "")
+    candidate.setdefault("genres", "")
     candidate.setdefault("release_year", "")
     candidate.setdefault("remote_url", "")
     candidate.setdefault("source_url", candidate.get("remote_url", ""))

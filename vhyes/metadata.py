@@ -1,6 +1,12 @@
 import re
+from urllib.parse import quote
 
 import requests
+
+try:
+    from imdb import IMDb
+except ImportError:  # pragma: no cover - optional provider
+    IMDb = None
 
 
 class BarcodeLookupError(Exception):
@@ -16,6 +22,9 @@ BARCODE_LOOKUP_URL = "https://api.barcodelookup.com/v3/products"
 UPCITEMDB_URL = "https://api.upcitemdb.com/prod/trial/lookup"
 WIKIDATA_SEARCH_URL = "https://www.wikidata.org/w/api.php"
 OPEN_LIBRARY_SEARCH_URL = "https://openlibrary.org/search.json"
+IMDB_TITLE_URL = "https://www.imdb.com/title/tt{movie_id}/"
+
+_IMDB_CLIENT = None
 
 PHYSICAL_MEDIA_TERMS = (
     "media",
@@ -90,49 +99,282 @@ def search_tmdb(query, api_key):
     return results
 
 
+
+def search_imdb(query):
+    if not query or IMDb is None:
+        return []
+
+    client = _imdb_client()
+    if client is None:
+        return []
+
+    try:
+        matches = client.search_movie(query)[:10]
+    except Exception:
+        return []
+
+    results = []
+    for match in matches[:8]:
+        movie_id = getattr(match, "movieID", None)
+        if not movie_id:
+            continue
+
+        try:
+            movie = client.get_movie(movie_id)
+        except Exception:
+            movie = match
+
+        kind = str(movie.get("kind") or match.get("kind") or "").lower()
+        if "video game" in kind or "podcast" in kind:
+            continue
+
+        title = movie.get("title") or movie.get("original title") or match.get("title")
+        if not title:
+            continue
+
+        genres = movie.get("genres") or []
+        runtime_minutes = _first_runtime_minutes(movie.get("runtimes"))
+        plot_outline = movie.get("plot outline") or _first_text(movie.get("plot"))
+        image_url = movie.get("full-size cover url") or movie.get("cover url") or ""
+        rating = movie.get("rating")
+        votes = _safe_int(movie.get("votes"))
+        imdb_id = str(movie_id).zfill(7)
+
+        raw_payload = {
+            "movieID": str(movie_id),
+            "title": title,
+            "kind": kind,
+            "year": _safe_int(movie.get("year")),
+            "rating": rating,
+            "votes": votes,
+            "runtimes": movie.get("runtimes") or [],
+            "genres": genres,
+            "directors": _person_names(movie.get("director") or movie.get("directors")),
+            "cast": _person_names(movie.get("cast"), limit=8),
+            "plot_outline": plot_outline,
+            "cover_url": image_url,
+        }
+
+        results.append(
+            {
+                "title": title,
+                "media_kind": "movie",
+                "release_year": _safe_int(movie.get("year")),
+                "runtime_minutes": runtime_minutes,
+                "genres": ", ".join(genres[:8]) if genres else "",
+                "summary": plot_outline,
+                "rating": rating,
+                "barcode": "",
+                "source_name": "imdb",
+                "source_id": str(movie_id),
+                "source_url": IMDB_TITLE_URL.format(movie_id=imdb_id),
+                "remote_url": image_url,
+                "confidence": votes or rating,
+                "raw_payload": raw_payload,
+            }
+        )
+    return results
+
+
 def search_wikidata(query):
     if not query:
         return []
 
-    response = requests.get(
-        WIKIDATA_SEARCH_URL,
-        params={
-            "action": "wbsearchentities",
-            "format": "json",
-            "language": "en",
-            "uselang": "en",
-            "type": "item",
-            "limit": 10,
-            "search": query,
-        },
-        headers={"User-Agent": "VHYes local media catalog"},
-        timeout=10,
-    )
-    response.raise_for_status()
+    try:
+        response = requests.get(
+            WIKIDATA_SEARCH_URL,
+            params={
+                "action": "wbsearchentities",
+                "format": "json",
+                "language": "en",
+                "uselang": "en",
+                "type": "item",
+                "limit": 10,
+                "search": query,
+            },
+            headers={"User-Agent": "VHYes local media catalog"},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return []
+
+    search_rows = response.json().get("search", [])
+    entity_ids = [item.get("id") for item in search_rows if item.get("id")]
+    entities = _wikidata_entities(entity_ids)
+
+    genre_ids = []
+    for entity in entities.values():
+        genre_ids.extend(_wikidata_claim_entity_ids(entity.get("claims", {}), "P136"))
+    genre_labels = _wikidata_labels(genre_ids)
 
     results = []
-    for item in response.json().get("search", []):
-        description = item.get("description") or ""
+    for item in search_rows:
+        entity = entities.get(item.get("id"), {})
+        description = _wikidata_description(entity) or item.get("description") or ""
         haystack = f"{item.get('label', '')} {description}".lower()
         if not any(word in haystack for word in ("film", "movie", "television", "series", "video")):
             continue
-        results.append(
-            {
-                "title": item.get("label"),
-                "media_kind": "movie",
-                "release_year": _year_from_text(description),
-                "summary": description,
-                "rating": "",
-                "barcode": "",
-                "source_name": "wikidata",
-                "source_id": item.get("id"),
-                "source_url": f"https://www.wikidata.org/wiki/{item.get('id')}",
-                "remote_url": "",
-                "confidence": None,
-                "raw_payload": item,
-            }
-        )
+        results.append(_wikidata_candidate(item, entity, genre_labels))
     return results
+
+
+def _wikidata_entities(entity_ids):
+    entity_ids = [entity_id for entity_id in entity_ids if entity_id]
+    if not entity_ids:
+        return {}
+
+    try:
+        response = requests.get(
+            WIKIDATA_SEARCH_URL,
+            params={
+                "action": "wbgetentities",
+                "format": "json",
+                "ids": "|".join(entity_ids[:10]),
+                "props": "labels|descriptions|claims",
+                "languages": "en",
+            },
+            headers={"User-Agent": "VHYes local media catalog"},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return {}
+    return response.json().get("entities", {})
+
+
+def _wikidata_labels(entity_ids):
+    entity_ids = sorted({entity_id for entity_id in entity_ids if entity_id})
+    if not entity_ids:
+        return {}
+
+    try:
+        response = requests.get(
+            WIKIDATA_SEARCH_URL,
+            params={
+                "action": "wbgetentities",
+                "format": "json",
+                "ids": "|".join(entity_ids[:40]),
+                "props": "labels",
+                "languages": "en",
+            },
+            headers={"User-Agent": "VHYes local media catalog"},
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return {}
+    entities = response.json().get("entities", {})
+    return {entity_id: _wikidata_label(entity) for entity_id, entity in entities.items()}
+
+
+def _wikidata_candidate(search_item, entity, genre_labels):
+    claims = entity.get("claims", {})
+    entity_id = search_item.get("id")
+    label = _wikidata_label(entity) or search_item.get("label")
+    description = _wikidata_description(entity) or search_item.get("description") or ""
+    imdb_id = _wikidata_claim_string(claims, "P345")
+    image_name = _wikidata_claim_string(claims, "P18")
+    genre_ids = _wikidata_claim_entity_ids(claims, "P136")
+    genres = [genre_labels.get(genre_id) for genre_id in genre_ids if genre_labels.get(genre_id)]
+    release_year = _wikidata_claim_year(claims, "P577") or _wikidata_claim_year(claims, "P571") or _year_from_text(description)
+    runtime_minutes = _wikidata_claim_quantity(claims, "P2047")
+
+    raw_payload = {
+        "search": search_item,
+        "wikidata": {
+            "id": entity_id,
+            "label": label,
+            "description": description,
+            "imdb_id": imdb_id,
+            "imdb_url": _imdb_url(imdb_id),
+            "image": image_name,
+            "genres": genres,
+            "release_year": release_year,
+            "runtime_minutes": runtime_minutes,
+        },
+    }
+
+    return {
+        "title": label,
+        "media_kind": "movie",
+        "release_year": release_year,
+        "runtime_minutes": runtime_minutes,
+        "genres": ", ".join(genres),
+        "summary": description,
+        "rating": "",
+        "barcode": "",
+        "source_name": "wikidata",
+        "source_id": entity_id,
+        "source_url": f"https://www.wikidata.org/wiki/{entity_id}" if entity_id else "",
+        "remote_url": _wikimedia_image_url(image_name),
+        "confidence": search_item.get("score"),
+        "raw_payload": raw_payload,
+    }
+
+
+def _wikidata_label(entity):
+    return ((entity.get("labels") or {}).get("en") or {}).get("value", "")
+
+
+def _wikidata_description(entity):
+    return ((entity.get("descriptions") or {}).get("en") or {}).get("value", "")
+
+
+def _wikidata_claim_string(claims, prop):
+    for claim in claims.get(prop, []):
+        value = _wikidata_claim_value(claim)
+        if value:
+            return str(value)
+    return ""
+
+
+def _wikidata_claim_entity_ids(claims, prop):
+    ids = []
+    for claim in claims.get(prop, []):
+        value = _wikidata_claim_value(claim)
+        if isinstance(value, dict) and value.get("id"):
+            ids.append(value["id"])
+    return ids
+
+
+def _wikidata_claim_year(claims, prop):
+    for claim in claims.get(prop, []):
+        value = _wikidata_claim_value(claim)
+        if isinstance(value, dict):
+            year = _year_from_text(value.get("time"))
+            if year:
+                return year
+    return None
+
+
+def _wikidata_claim_quantity(claims, prop):
+    for claim in claims.get(prop, []):
+        value = _wikidata_claim_value(claim)
+        if isinstance(value, dict) and value.get("amount") is not None:
+            try:
+                return int(float(value["amount"]))
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _wikidata_claim_value(claim):
+    mainsnak = claim.get("mainsnak") or {}
+    datavalue = mainsnak.get("datavalue") or {}
+    return datavalue.get("value")
+
+
+def _wikimedia_image_url(filename):
+    if not filename:
+        return ""
+    return f"https://commons.wikimedia.org/wiki/Special:FilePath/{quote(filename)}"
+
+
+def _imdb_url(imdb_id):
+    if not imdb_id:
+        return ""
+    return IMDB_TITLE_URL.format(movie_id=str(imdb_id).replace("tt", ""))
 
 
 def search_open_library(query):
@@ -198,11 +440,13 @@ def enrich_barcode_candidate(candidate, tmdb_api_key=""):
     enriched = []
     if candidate.get("media_kind") == "movie":
         enriched.extend(search_tmdb(query, tmdb_api_key))
+        enriched.extend(search_imdb(query))
         enriched.extend(search_wikidata(query))
     elif candidate.get("media_kind") in {"book", "magazine", "audiobook"}:
         enriched.extend(search_open_library(query))
     else:
         enriched.extend(search_tmdb(query, tmdb_api_key))
+        enriched.extend(search_imdb(query))
         enriched.extend(search_wikidata(query))
         enriched.extend(search_open_library(query))
 
@@ -226,6 +470,8 @@ def enrich_barcode_candidate(candidate, tmdb_api_key=""):
             "release_year": best.get("release_year") or candidate.get("release_year"),
             "summary": best.get("summary") or candidate.get("summary"),
             "rating": best.get("rating") or candidate.get("rating"),
+            "runtime_minutes": best.get("runtime_minutes") or candidate.get("runtime_minutes"),
+            "genres": best.get("genres") or candidate.get("genres"),
             "remote_url": best.get("remote_url") or candidate.get("remote_url"),
             "source_name": best.get("source_name") or candidate.get("source_name"),
             "source_id": best.get("source_id") or candidate.get("source_id"),
@@ -248,11 +494,13 @@ def enrich_barcode_candidate(candidate, tmdb_api_key=""):
 def clean_media_search_title(title):
     title = clean_barcode_title(title)
     title = re.sub(r"\b(disney|walt disney|mgm/ua|studios?)\b", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\([^)]*(blu[- ]?ray|blue ray|dvd|vhs|4k|uhd|ultra hd|digital|disc|disk|video)[^)]*\)", "", title, flags=re.IGNORECASE)
     title = re.sub(r"\([^)]*(anniversary|edition|special|widescreen|fullscreen|collector|collectors|limited)[^)]*\)", "", title, flags=re.IGNORECASE)
-    title = re.sub(r"\b(vhs|dvd|blu[- ]?ray|4k|uhd|ultra hd|video tape|videotape|cassette|disc|disk)\b", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\b(vhs|dvd|blu[- ]?ray|blue ray|4k|uhd|ultra hd|video tape|videotape|cassette|disc|disk)\b", "", title, flags=re.IGNORECASE)
     title = re.sub(r"\b(anniversary|edition|special|widescreen|fullscreen|collector'?s?|limited)\b", "", title, flags=re.IGNORECASE)
     title = re.sub(r"\b(sequel|part)\b\s*\d*", "", title, flags=re.IGNORECASE)
     title = re.sub(r"\b(18|19|20)\d{2}\b", "", title)
+    title = title.replace("+", " ")
     title = re.sub(r"\s+", " ", title).strip(" -:|")
     if "milo" in title.lower() and "return" in title.lower() and ":" not in title:
         title = re.sub(r"\bAtlantis\b\s+", "Atlantis: ", title, flags=re.IGNORECASE)
@@ -264,8 +512,10 @@ def _best_enrichment_match(query, candidates):
         return None
 
     query_tokens = _title_tokens(query)
-    ranked = []
-    for candidate in candidates:
+    source_priority = {"tmdb": 4, "imdb": 3, "wikidata": 2, "openlibrary": 1}
+    best = None
+    best_score = None
+    for index, candidate in enumerate(candidates):
         title = candidate.get("title") or ""
         title_tokens = _title_tokens(title)
         if not title_tokens:
@@ -273,12 +523,19 @@ def _best_enrichment_match(query, candidates):
         overlap = len(query_tokens & title_tokens)
         if query_tokens and overlap < max(1, min(2, len(query_tokens))):
             continue
-        ranked.append((overlap, bool(candidate.get("release_year")), bool(candidate.get("summary")), candidate))
+        score = (
+            overlap,
+            bool(candidate.get("release_year")),
+            bool(candidate.get("summary")),
+            source_priority.get(candidate.get("source_name"), 0),
+            _score_confidence(candidate.get("confidence")),
+            -index,
+        )
+        if best_score is None or score > best_score:
+            best = candidate
+            best_score = score
 
-    if not ranked:
-        return None
-    ranked.sort(key=lambda item: item[:3], reverse=True)
-    return ranked[0][3]
+    return best
 
 
 def _title_tokens(value):
@@ -288,6 +545,58 @@ def _title_tokens(value):
         for token in re.findall(r"[a-z0-9]+", (value or "").lower())
         if token not in stop and len(token) > 1
     }
+
+
+
+def _imdb_client():
+    global _IMDB_CLIENT
+    if IMDb is None:
+        return None
+    if _IMDB_CLIENT is None:
+        try:
+            _IMDB_CLIENT = IMDb()
+        except Exception:
+            return None
+    return _IMDB_CLIENT
+
+
+def _first_text(values):
+    if isinstance(values, (list, tuple)) and values:
+        return values[0]
+    if isinstance(values, str):
+        return values
+    return ""
+
+
+def _first_runtime_minutes(values):
+    if not values:
+        return None
+    if isinstance(values, (list, tuple)):
+        values = values[0] if values else None
+    match = re.search(r"\d+", str(values or ""))
+    return int(match.group(0)) if match else None
+
+
+def _person_names(values, limit=4):
+    if not values:
+        return []
+    if not isinstance(values, (list, tuple)):
+        values = [values]
+    return [str(value) for value in values[:limit]]
+
+
+def _safe_int(value):
+    try:
+        return int(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _score_confidence(value):
+    try:
+        return float(str(value).replace(",", ""))
+    except (TypeError, ValueError):
+        return 0
 
 
 def lookup_barcode(barcode, barcode_lookup_key=""):
