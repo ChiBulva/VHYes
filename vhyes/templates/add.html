@@ -113,6 +113,7 @@
 
         toggle.addEventListener('change', function () {
             window.localStorage.setItem(storageKey, toggle.checked ? 'true' : 'false');
+            readyScanner({ clear: false });
         });
     }
 
@@ -131,10 +132,14 @@
             input.value = '';
         }
 
-        window.setTimeout(function () {
+        function focusScanner() {
             input.focus({ preventScroll: true });
             input.select();
-        }, 50);
+        }
+
+        focusScanner();
+        window.setTimeout(focusScanner, 50);
+        window.setTimeout(focusScanner, 150);
     }
 
     readyScanner({ clear: true });
